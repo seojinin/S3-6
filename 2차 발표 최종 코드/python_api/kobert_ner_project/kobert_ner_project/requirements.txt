@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+torch
+transformers
+sentencepiece
+safetensors
+pandas
+pdfplumber
+openpyxl

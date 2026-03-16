@@ -1,0 +1,49 @@
+{
+  "add_cross_attention": false,
+  "architectures": [
+    "BertForTokenClassification"
+  ],
+  "attention_probs_dropout_prob": 0.1,
+  "author": "Heewon Jeon(madjakarta@gmail.com)",
+  "bos_token_id": null,
+  "classifier_dropout": null,
+  "dtype": "float32",
+  "eos_token_id": null,
+  "gradient_checkpointing": false,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 768,
+  "id2label": {
+    "0": "O",
+    "1": "B-ITEM_TYPE",
+    "2": "I-ITEM_TYPE",
+    "3": "B-PRODUCT",
+    "4": "I-PRODUCT",
+    "5": "B-COMPANY",
+    "6": "I-COMPANY"
+  },
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "is_decoder": false,
+  "kobert_version": 1.0,
+  "label2id": {
+    "B-COMPANY": 5,
+    "B-ITEM_TYPE": 1,
+    "B-PRODUCT": 3,
+    "I-COMPANY": 6,
+    "I-ITEM_TYPE": 2,
+    "I-PRODUCT": 4,
+    "O": 0
+  },
+  "layer_norm_eps": 1e-12,
+  "max_position_embeddings": 512,
+  "model_type": "bert",
+  "num_attention_heads": 12,
+  "num_hidden_layers": 12,
+  "pad_token_id": 1,
+  "tie_word_embeddings": true,
+  "transformers_version": "5.0.0",
+  "type_vocab_size": 2,
+  "use_cache": false,
+  "vocab_size": 8002
+}

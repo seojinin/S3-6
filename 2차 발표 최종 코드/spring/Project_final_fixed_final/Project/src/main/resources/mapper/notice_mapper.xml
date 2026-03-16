@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="pj.notice.mapper.NoticeMapper">
+
+	<insert id="insertNotice">
+	    insert ignore into tb_notice
+	    (notice_number, notice_title, contract_method, amount, agency, region, demand_agency)
+	    values
+	    (#{notice_number}, #{notice_title}, #{contract_method}, #{amount}, #{agency}, #{region}, #{demand_agency})
+	</insert>
+
+	<select id="selectNoticeById" resultType="pj.notice.model.NoticeModel">
+		select *
+		from tb_notice
+		where notice_id = #{notice_id}
+	</select>
+
+	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
+		select *
+		from tb_notice
+	</select>
+</mapper>

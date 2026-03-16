@@ -1,0 +1,20 @@
+{
+  "label2id": {
+    "O": 0,
+    "B-ITEM_TYPE": 1,
+    "I-ITEM_TYPE": 2,
+    "B-PRODUCT": 3,
+    "I-PRODUCT": 4,
+    "B-COMPANY": 5,
+    "I-COMPANY": 6
+  },
+  "id2label": {
+    "0": "O",
+    "1": "B-ITEM_TYPE",
+    "2": "I-ITEM_TYPE",
+    "3": "B-PRODUCT",
+    "4": "I-PRODUCT",
+    "5": "B-COMPANY",
+    "6": "I-COMPANY"
+  }
+}
