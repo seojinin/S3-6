@@ -8,4 +8,5 @@ public class NoticeEntityDto {
 	private String type;
 	private String fileName;
 	private String noticeNumber;
+	private String fileUrl;
 }

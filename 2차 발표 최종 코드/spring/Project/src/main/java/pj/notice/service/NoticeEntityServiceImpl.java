@@ -42,6 +42,7 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 	        entity.setEntity_value(dto.getText());
 	        entity.setEntity_type(dto.getType());
 	        entity.setFile_name(dto.getFileName());
+	        entity.setFile_url(dto.getFileUrl());
 
 	        list.add(entity);
 	    }

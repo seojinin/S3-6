@@ -14,4 +14,5 @@ public class NoticeEntityModel {
     private String entity_value;
 
     private String file_name;
+    private String file_url;
 }

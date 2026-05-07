@@ -58,7 +58,26 @@ let totalCount = 0;
 let currentPage = 1;
 const itemsPerPage = 10;
 
-window.addEventListener('DOMContentLoaded', () => { fetchBidList(); });
+window.addEventListener('DOMContentLoaded', () => {
+
+    // 👉 URL에서 noticeNumber 가져오기
+    const params = new URLSearchParams(window.location.search);
+    const noticeNumber = params.get("noticeNumber");
+
+    // 👉 상세페이지인지 체크
+    if (noticeNumber) {
+        // 상세 API 호출
+        fetch(`http://localhost:8080/api/notices/${noticeNumber}/detail`)
+            .then(res => res.json())
+            .then(data => renderDetail(data))
+            .catch(err => console.error("상세 API 오류:", err));
+
+    } else {
+        // 👉 목록 페이지면 기존 코드 실행
+        fetchBidList();
+    }
+
+});
 
 // ===== 나라장터 API 목록 호출 =====
 async function fetchBidList(page = 1) {
@@ -72,7 +91,7 @@ async function fetchBidList(page = 1) {
     try {
         const res  = await fetch("http://localhost:8080/api/notices");
         const json = await res.json();
-		apiData = json;
+      apiData = json;
 
         //const items = json?.response?.body?.items?.item || [];
         totalCount  = json.length;
@@ -161,7 +180,9 @@ function renderBidTable() {
         const bid = mapBid(item, (currentPage - 1) * itemsPerPage + i);
         const row = table.insertRow();
         row.style.cursor = 'pointer';
-        row.onclick = () => showBidDetail(bid.ntceNo, bid.ntceOrd);
+        row.onclick = () => {
+    location.href = `/detail.html?noticeNumber=${item.notice_number}`;
+};
 
         row.insertCell(0).textContent = bid.seq;
         const titleCell = row.insertCell(1);
@@ -179,6 +200,26 @@ function renderBidTable() {
             fileCell.innerHTML = `<a href="${bid.fileUrl}" target="_blank" onclick="event.stopPropagation()">📎 ${bid.fileNm || '첨부파일'}</a>`;
         } else { fileCell.textContent = '-'; }
     });
+}
+
+// ===== 상세 페이지 렌더링 =====
+function renderDetail(data) {
+
+    document.getElementById("detailTitle").textContent = data.notice_title || '-';
+
+    document.getElementById("detailNtceNo").textContent = data.notice_number || '-';
+    document.getElementById("detailMethod").textContent = data.contract_method || '-';
+
+    document.getElementById("detailDminstt").textContent = data.agency || '-';
+    document.getElementById("detailDmndInstt").textContent = data.demand_agency || '-';
+
+    document.getElementById("detailAmount").textContent = formatAmount(data.amount);
+    document.getElementById("detailRegion").textContent = data.region || '-';
+
+    document.getElementById("detailNtceDate").textContent = formatDate(data.bid_start);
+    document.getElementById("detailOpengDate").textContent = formatDate(data.bid_end);
+
+    document.getElementById("detailBizType").textContent = data.contract_method || '-';
 }
 
 function renderMainBidTable() {

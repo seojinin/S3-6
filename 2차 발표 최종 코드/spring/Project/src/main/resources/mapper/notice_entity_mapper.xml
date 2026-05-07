@@ -7,16 +7,16 @@
 
 	<insert id="insertEntities">
     	insert ignore into tb_notice_entity
-    	(notice_number, entity_value, entity_type, file_name)
+    	(notice_number, entity_value, entity_type, file_name, file_url)
     	values
     	<foreach collection="list" item="item" separator=",">
-        	(#{item.notice_number}, #{item.entity_value}, #{item.entity_type}, #{item.file_name})
+        	(#{item.notice_number}, #{item.entity_value}, #{item.entity_type}, #{item.file_name}, #{item.file_url})
     	</foreach>
 	</insert>
 
 	<!-- 공고 ID로 조회 -->
 	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
-	    SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type, e.file_name, n.notice_title
+	    SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type, e.file_name, n.notice_title, e.file_url
 	    FROM tb_notice_entity e
 	    JOIN tb_notice n ON e.notice_number = n.notice_number
 	    WHERE e.notice_number = #{noticeNumber}
@@ -24,7 +24,7 @@
 
 	<!-- 키워드 검색 -->
 	<select id="searchByKeyword" resultType="pj.notice.model.NoticeEntityModel">
-    	SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type, e.file_name, n.notice_title
+    	SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type, e.file_name, n.notice_title, e.file_url
     	FROM tb_notice_entity e
     	JOIN tb_notice n ON e.notice_number = n.notice_number
     	WHERE e.entity_value LIKE CONCAT('%', #{keyword}, '%')
