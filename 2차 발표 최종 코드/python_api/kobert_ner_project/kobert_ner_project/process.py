@@ -29,6 +29,78 @@ CHAPTER_PATTERNS = [
 
 
 ########################################
+# ===== 챕터 제목 정리 =====
+########################################
+
+def clean_start(text):
+    text = text.strip()
+
+    while True:
+        new_text = text
+
+        # 숫자 계층 (1. / 1-1 / 1.1 등)
+        new_text = re.sub(r'^\d+([.\-]\d+)*[.\-]?\s*', '', new_text)
+
+        #숫자 괄호 (1) / 2) / (1)
+        new_text = re.sub(r'^\(?\d+\)\s*', '', new_text)
+
+        # 대괄호 숫자 [1]
+        new_text = re.sub(r'^\[\d+\]\s*', '', new_text)
+
+        #원형 숫자 (① ② ③ …)
+        new_text = re.sub(r'^[①②③④⑤⑥⑦⑧⑨⑩]+\s*', '', new_text)
+
+        #한글 항목 (가. 나. / 가) 등)
+        new_text = re.sub(r'^[가-힣][\.\)]\s*', '', new_text)
+
+        # 영문 항목 (A. a) 등)
+        new_text = re.sub(r'^[A-Za-z][\.\)]\s*', '', new_text)
+
+        #(※, ●, ■, -, ▶ 등)
+        new_text = re.sub(r'^[\-\*\•\●\■\※\▶\▷\◆\◇]+\s*', '', new_text)
+
+        # 반복 종료 조건
+        if new_text == text:
+            break
+
+        text = new_text.strip()
+
+    #마지막 찌꺼기 기호 제거
+    text = re.sub(r'^[^\w가-힣]+', '', text)
+
+    return text.strip()
+
+########################################
+# ===== 라인 정리 =====
+########################################
+
+def merge_lines(lines):
+    merged = []
+    buffer = ""
+
+    for line in lines:
+        line = line.strip()
+
+        if not line:
+            continue
+
+        #숫자 또는 특수문자로 시작하면 새로운 문장
+        if re.match(r'^[^가-힣A-Za-z]', line):
+            if buffer:
+                merged.append(buffer.strip())
+            buffer = line
+        else:
+            # 이전 문장에 이어붙이기
+            buffer += " " + line
+
+    # 마지막 처리
+    if buffer:
+        merged.append(buffer.strip())
+
+    return merged
+
+
+########################################
 # ===== 공통 유틸 =====
 ########################################
 
@@ -128,14 +200,24 @@ def split_sentences(lines):
     sentences = []
     num = 1
 
+    lines = merge_lines(lines)
+
     for line in lines:
+
+        line = line.strip()
+
+        if not line:
+            continue
 
         parts = re.split(r"[.!?]\s+|\n", line)
 
         for p in parts:
-            p = p.strip()
+            p = clean_start(p)
 
             if not p:
+                continue
+
+            if len(p) <= 6:
                 continue
 
             sentences.append({
@@ -198,6 +280,7 @@ def process_file(data):
             results.append({
                 "bidNtceNo": bid_id,
                 "ntceSpecFileNm": file_name,
+                "ntceSpecDocUrl": file_url,
                 "sentences": sentences
             })
 
