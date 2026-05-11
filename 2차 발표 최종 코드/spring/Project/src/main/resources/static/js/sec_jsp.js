@@ -52,51 +52,54 @@ const DB = {
     }
 };
 
-// ===== API 상태 =====
-let apiData = [];
+// ===== 상태 변수 =====
+let allData    = [];   // 서버에서 받은 전체 데이터
+let apiData    = [];   // 검색 필터 적용 후 표시할 데이터
 let totalCount = 0;
 let currentPage = 1;
 const itemsPerPage = 10;
 
+// ===== 목록 상태 저장/복원 =====
+let savedBidState = null;
+
+function saveBidState() {
+    savedBidState = {
+        page:         currentPage,
+        searchInput:  document.getElementById('searchInput')?.value  || '',
+        regionFilter: document.getElementById('regionFilter')?.value || '',
+        methodFilter: document.getElementById('methodFilter')?.value || '',
+        agencyFilter: document.getElementById('agencyFilter')?.value || '',
+    };
+}
+
+function restoreBidState() {
+    if (!savedBidState) return false;
+    if (document.getElementById('searchInput'))  document.getElementById('searchInput').value  = savedBidState.searchInput;
+    if (document.getElementById('regionFilter')) document.getElementById('regionFilter').value = savedBidState.regionFilter;
+    if (document.getElementById('methodFilter')) document.getElementById('methodFilter').value = savedBidState.methodFilter;
+    if (document.getElementById('agencyFilter')) document.getElementById('agencyFilter').value = savedBidState.agencyFilter;
+    fetchBidList(savedBidState.page);
+    savedBidState = null;
+    return true;
+}
+
+// ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
-
-    // 👉 URL에서 noticeNumber 가져오기
-    const params = new URLSearchParams(window.location.search);
-    const noticeNumber = params.get("noticeNumber");
-
-    // 👉 상세페이지인지 체크
-    if (noticeNumber) {
-        // 상세 API 호출
-        fetch(`http://localhost:8080/api/notices/${noticeNumber}/detail`)
-            .then(res => res.json())
-            .then(data => renderDetail(data))
-            .catch(err => console.error("상세 API 오류:", err));
-
-    } else {
-        // 👉 목록 페이지면 기존 코드 실행
-        fetchBidList();
-    }
-
+    history.replaceState({ page: 'main' }, '', '#main');
+    fetchBidList();
 });
 
-// ===== 나라장터 API 목록 호출 =====
+// ===== 목록 호출 =====
 async function fetchBidList(page = 1) {
     currentPage = page;
     showTableLoading('bidTable', 7);
     showTableLoading('mainBidTable', 6);
 
-    const keyword = document.getElementById('searchInput')?.value.trim() || '';
-    const params = new URLSearchParams({ pageNo: page, numOfRows: itemsPerPage, bidNtceNm: keyword });
-
     try {
-        const res  = await fetch("http://localhost:8080/api/notices");
-        const json = await res.json();
-      apiData = json;
+        const res = await fetch('http://localhost:8080/api/notices');
+        allData   = await res.json();
 
-        //const items = json?.response?.body?.items?.item || [];
-        totalCount  = json.length;
-        apiData     = json;
-
+        applySearchFilter();
         renderBidTable();
         renderMainBidTable();
         renderPagination();
@@ -108,40 +111,14 @@ async function fetchBidList(page = 1) {
     }
 }
 
-// ===== 필드 매핑 =====
-function mapBid(item, index) {
-    return {
-        seq: index + 1,
-
-        ntceNo: item.notice_number || '-',
-        ntceOrd: '00',
-
-        title: item.notice_title || '-',
-
-        method: item.contract_method || '-',
-
-        amount: formatAmount(item.amount),
-
-        region: item.region || '-',
-
-        agency: item.agency || '-',
-
-        dminstt: item.agency || '-',
-
-        dmndInstt: item.demand_agency || '-',
-
-        ntceDate: formatDate(item.bid_start),
-
-        opengDate: formatDate(item.bid_end),
-
-        bizType: item.contract_method || '-',
-
-        fileNm: null,
-        fileUrl: null,
-        files: []
-    };
+// ===== 검색 필터 적용 =====
+function applySearchFilter() {
+    const searchTerm = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
+    apiData    = searchTerm ? allData.filter(item => (item.notice_title || '').toLowerCase().includes(searchTerm)) : allData;
+    totalCount = apiData.length;
 }
 
+// ===== 포맷 함수 =====
 function formatAmount(val) {
     if (!val || val === '0') return '-';
     const n = parseInt(val);
@@ -158,16 +135,11 @@ function formatDate(val) {
     return val;
 }
 
-function extractRegion(nm) {
-    const regions = ['서울','경기','부산','인천','대구','광주','대전','울산','세종','강원','충북','충남','전북','전남','경북','경남','제주'];
-    for (const r of regions) { if (nm.includes(r)) return r; }
-    return nm.substring(0, 2);
-}
-
 // ===== 테이블 렌더링 =====
 function renderBidTable() {
     const table = document.getElementById('bidTable');
     while (table.rows.length > 1) table.deleteRow(1);
+
     const searchTerm = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
 
     if (apiData.length === 0) {
@@ -176,115 +148,68 @@ function renderBidTable() {
         cell.textContent = '검색 결과가 없습니다.'; return;
     }
 
-    apiData.forEach((item, i) => {
-        const bid = mapBid(item, (currentPage - 1) * itemsPerPage + i);
-        const row = table.insertRow();
+    const start = (currentPage - 1) * itemsPerPage;
+    const end   = Math.min(start + itemsPerPage, apiData.length);
+
+    for (let i = start; i < end; i++) {
+        const item = apiData[i];
+        const row  = table.insertRow();
         row.style.cursor = 'pointer';
-        row.onclick = () => {
-    location.href = `/detail.html?noticeNumber=${item.notice_number}`;
-};
+        row.onclick = () => { saveBidState(); showBidDetail(item.notice_number); };
 
-        row.insertCell(0).textContent = bid.seq;
+        row.insertCell(0).textContent = i + 1;
+
         const titleCell = row.insertCell(1);
-        if (searchTerm && bid.title.toLowerCase().includes(searchTerm)) {
+        if (searchTerm) {
             const regex = new RegExp(`(${searchTerm})`, 'gi');
-            titleCell.innerHTML = bid.title.replace(regex, '<span class="highlight">$1</span>');
-        } else { titleCell.textContent = bid.title; }
-        row.insertCell(2).textContent = bid.method;
-        row.insertCell(3).textContent = bid.amount;
-        row.insertCell(4).textContent = bid.region;
-        row.insertCell(5).textContent = bid.agency;
+            titleCell.innerHTML = (item.notice_title || '-').replace(regex, '<span class="highlight">$1</span>');
+        } else {
+            titleCell.textContent = item.notice_title || '-';
+        }
 
-        const fileCell = row.insertCell(6);
-        if (bid.fileUrl) {
-            fileCell.innerHTML = `<a href="${bid.fileUrl}" target="_blank" onclick="event.stopPropagation()">📎 ${bid.fileNm || '첨부파일'}</a>`;
-        } else { fileCell.textContent = '-'; }
-    });
-}
-
-// ===== 상세 페이지 렌더링 =====
-function renderDetail(data) {
-
-    document.getElementById("detailTitle").textContent = data.notice_title || '-';
-
-    document.getElementById("detailNtceNo").textContent = data.notice_number || '-';
-    document.getElementById("detailMethod").textContent = data.contract_method || '-';
-
-    document.getElementById("detailDminstt").textContent = data.agency || '-';
-    document.getElementById("detailDmndInstt").textContent = data.demand_agency || '-';
-
-    document.getElementById("detailAmount").textContent = formatAmount(data.amount);
-    document.getElementById("detailRegion").textContent = data.region || '-';
-
-    document.getElementById("detailNtceDate").textContent = formatDate(data.bid_start);
-    document.getElementById("detailOpengDate").textContent = formatDate(data.bid_end);
-
-    document.getElementById("detailBizType").textContent = data.contract_method || '-';
+        row.insertCell(2).textContent = item.contract_method || '-';
+        row.insertCell(3).textContent = formatAmount(item.amount);
+        row.insertCell(4).textContent = item.region           || '-';
+        row.insertCell(5).textContent = item.agency           || '-';
+        row.insertCell(6).textContent = '-';
+    }
 }
 
 function renderMainBidTable() {
     const table = document.getElementById('mainBidTable');
     if (!table) return;
     while (table.rows.length > 1) table.deleteRow(1);
-    apiData.slice(0, 4).forEach((item, i) => {
-        const bid = mapBid(item, i);
+    allData.slice(0, 4).forEach((item, i) => {
         const row = table.insertRow();
         row.style.cursor = 'pointer';
-        row.onclick = () => { showPage('bid'); setTimeout(() => showBidDetail(bid.ntceNo, bid.ntceOrd), 100); };
-        row.insertCell(0).textContent = bid.seq;
-        row.insertCell(1).textContent = bid.title;
-        row.insertCell(2).textContent = bid.method;
-        row.insertCell(3).textContent = bid.amount;
-        row.insertCell(4).textContent = bid.region;
-        row.insertCell(5).textContent = bid.agency;
+        row.onclick = () => { showPage('bid'); setTimeout(() => showBidDetail(item.notice_number), 100); };
+        row.insertCell(0).textContent = i + 1;
+        row.insertCell(1).textContent = item.notice_title    || '-';
+        row.insertCell(2).textContent = item.contract_method || '-';
+        row.insertCell(3).textContent = formatAmount(item.amount);
+        row.insertCell(4).textContent = item.region          || '-';
+        row.insertCell(5).textContent = item.agency          || '-';
     });
 }
 
 // ===== 상세 페이지 =====
-async function showBidDetail(ntceNo, ntceOrd = '00') {
-    const cached = apiData.find(i => i.bidNtceNo === ntceNo);
-    if (cached) renderDetail(mapBid(cached, 0));
+function showBidDetail(noticeNumber) {
     showPage('bidDetail');
 
-    try {
-        const [detailRes, fileRes] = await Promise.all([
-            fetch(`/api/bid/detail?bidNtceNo=${ntceNo}&bidNtceOrd=${ntceOrd}`),
-            fetch(`/api/bid/files?bidNtceNo=${ntceNo}&bidNtceOrd=${ntceOrd}`)
-        ]);
-        const detailJson = await detailRes.json();
-        const fileJson   = await fileRes.json();
+    const item = allData.find(i => i.notice_number === noticeNumber);
+    if (!item) return;
 
-        const rawItem = detailJson?.response?.body?.items?.item;
-        const detailItem = Array.isArray(rawItem) ? rawItem[0] : rawItem;
-        if (!detailItem) return;
-
-        const bid = mapBid(detailItem, 0);
-        const rawFiles = fileJson?.response?.body?.items?.item || [];
-        bid.files = Array.isArray(rawFiles) ? rawFiles : (rawFiles ? [rawFiles] : []);
-        renderDetail(bid);
-    } catch (e) { console.error('상세 API 오류:', e); }
-}
-
-function renderDetail(bid) {
-    document.getElementById('detailTitle').textContent     = bid.title;
-    document.getElementById('detailNtceNo').textContent    = bid.ntceNo;
-    document.getElementById('detailMethod').textContent    = bid.method;
-    document.getElementById('detailDminstt').textContent   = bid.dminstt;
-    document.getElementById('detailDmndInstt').textContent = bid.dmndInstt;
-    document.getElementById('detailAmount').textContent    = bid.amount;
-    document.getElementById('detailNtceDate').textContent  = bid.ntceDate;
-    document.getElementById('detailOpengDate').textContent = bid.opengDate;
-    document.getElementById('detailBizType').textContent   = bid.bizType;
-    document.getElementById('detailRegion').textContent    = bid.region;
-
-    const filesCell = document.getElementById('detailFiles');
-    if (bid.files && bid.files.length > 0) {
-        filesCell.innerHTML = bid.files.map(f =>
-            `<a href="${f.docUrl || f.ntceSpecDocUrl1 || '#'}" target="_blank">📎 ${f.docNm || f.ntceSpecDocUrl1Nm || '첨부파일'}</a>`
-        ).join('<br>');
-    } else if (bid.fileUrl) {
-        filesCell.innerHTML = `<a href="${bid.fileUrl}" target="_blank">📎 ${bid.fileNm || '첨부파일'}</a>`;
-    } else { filesCell.textContent = '-'; }
+    document.getElementById('detailTitle').textContent      = item.notice_title    || '-';
+    document.getElementById('detailNtceNo').textContent     = item.notice_number   || '-';
+    document.getElementById('detailMethod').textContent     = item.contract_method || '-';
+    document.getElementById('detailDminstt').textContent    = item.agency          || '-';
+    document.getElementById('detailDmndInstt').textContent  = item.demand_agency   || '-';
+    document.getElementById('detailAmount').textContent     = formatAmount(item.amount);
+    document.getElementById('detailNtceDate').textContent   = formatDate(item.bid_start);
+    document.getElementById('detailOpengDate').textContent  = formatDate(item.bid_end);
+    document.getElementById('detailBizType').textContent    = item.contract_method || '-';
+    document.getElementById('detailRegion').textContent     = item.region          || '-';
+    document.getElementById('detailFiles').textContent      = '-';
 }
 
 // ===== 페이지네이션 =====
@@ -293,9 +218,10 @@ function renderPagination() {
     const div = document.getElementById('pagination');
     let html = `<button onclick="fetchBidList(${currentPage-1})" ${currentPage===1?'disabled':''}>이전</button>`;
     for (let i = 1; i <= totalPages; i++) {
-        if (i===1||i===totalPages||(i>=currentPage-2&&i<=currentPage+2))
+        if (i===1 || i===totalPages || (i>=currentPage-2 && i<=currentPage+2))
             html += `<button onclick="fetchBidList(${i})" class="${i===currentPage?'active':''}">${i}</button>`;
-        else if (i===currentPage-3||i===currentPage+3) html += `<button disabled>...</button>`;
+        else if (i===currentPage-3 || i===currentPage+3)
+            html += `<button disabled>...</button>`;
     }
     html += `<button onclick="fetchBidList(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>다음</button>`;
     div.innerHTML = html;
@@ -304,43 +230,61 @@ function renderPagination() {
 // ===== 통계 =====
 function updateBidStats() {
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
-    const todayCount = apiData.filter(b => String(b.bidNtceDt||'').startsWith(today)).length;
+    const todayCount = allData.filter(b => String(b.bid_start||'').startsWith(today)).length;
     let matchedCount = 0;
     if (DB.currentUser) {
         const kws = DB.getUserKeywords();
-        matchedCount = apiData.filter(b => kws.some(kw => (b.bidNtceNm||'').includes(kw))).length;
+        matchedCount = allData.filter(b => kws.some(kw => (b.notice_title||'').includes(kw))).length;
     }
-    const amounts = apiData.map(b => parseInt(b.presmptPrce||0)).filter(n=>n>0);
+    const amounts   = allData.map(b => parseInt(b.amount||0)).filter(n => n > 0);
     const avgAmount = amounts.length ? formatAmount(Math.round(amounts.reduce((a,b)=>a+b,0)/amounts.length)) : '-';
 
-    document.getElementById('totalBids').textContent   = totalCount;
+    document.getElementById('totalBids').textContent   = allData.length;
     document.getElementById('todayBids').textContent   = todayCount;
     document.getElementById('matchedBids').textContent = matchedCount;
     document.getElementById('avgAmount').textContent   = avgAmount;
 }
 
 // ===== 검색/필터 =====
-function searchBids()          { fetchBidList(1); }
-function handleSearchEnter(e)  { if (e.key==='Enter') searchBids(); }
-function applyFilters()        { fetchBidList(1); }
+function searchBids() { applySearchFilter(); currentPage = 1; renderBidTable(); renderPagination(); }
+function handleSearchEnter(e) { if (e.key === 'Enter') searchBids(); }
+function applyFilters()       { searchBids(); }
 function clearFilters() {
-    ['regionFilter','methodFilter','agencyFilter'].forEach(id => document.getElementById(id).value='');
-    document.getElementById('searchInput').value='';
-    fetchBidList(1);
+    ['regionFilter','methodFilter','agencyFilter'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('searchInput').value = '';
+    applySearchFilter(); currentPage = 1; renderBidTable(); renderPagination();
 }
+
+// ===== 페이지 전환 =====
+function showPage(id, pushHistory = true) {
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id !== 'mypage') resetKeywordEditMode();
+    if (id === 'mypage') { resetKeywordEditMode(); loadMyPage(); }
+    if (id === 'bid')    { if (!restoreBidState()) updateBidStats(); }
+
+    // 브라우저 히스토리에 현재 페이지 등록
+    if (pushHistory) history.pushState({ page: id }, '', '#' + id);
+}
+
+// 브라우저 뒤로가기/앞으로가기 감지
+window.addEventListener('popstate', (e) => {
+    const id = e.state?.page || 'main';
+    showPage(id, false);
+});
 
 // ===== 로딩/에러 =====
 function showTableLoading(tableId, cols) {
     const t = document.getElementById(tableId); if (!t) return;
-    while (t.rows.length>1) t.deleteRow(1);
-    const row=t.insertRow(); row.className='loading-row';
-    const cell=row.insertCell(0); cell.colSpan=cols; cell.textContent='불러오는 중...';
+    while (t.rows.length > 1) t.deleteRow(1);
+    const row = t.insertRow(); row.className = 'loading-row';
+    const cell = row.insertCell(0); cell.colSpan = cols; cell.textContent = '불러오는 중...';
 }
 function showTableError(tableId, cols, msg) {
     const t = document.getElementById(tableId); if (!t) return;
-    while (t.rows.length>1) t.deleteRow(1);
-    const row=t.insertRow(); const cell=row.insertCell(0);
-    cell.colSpan=cols; cell.style.cssText='text-align:center;padding:40px;color:#ef4444;'; cell.textContent=msg;
+    while (t.rows.length > 1) t.deleteRow(1);
+    const row = t.insertRow(); const cell = row.insertCell(0);
+    cell.colSpan = cols; cell.style.cssText = 'text-align:center;padding:40px;color:#ef4444;'; cell.textContent = msg;
 }
 
 // ===== 키워드 알림 체크 =====
@@ -348,34 +292,23 @@ function checkNewBidsForKeywords() {
     if (!DB.currentUser) return;
     const kws = DB.getUserKeywords();
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
-    apiData.forEach(item => {
-        if (String(item.bidNtceDt||'').startsWith(today)) {
-            kws.forEach(kw => { if ((item.bidNtceNm||'').includes(kw)) DB.addNotification(`새 입찰공고: ${item.bidNtceNm}`, kw); });
+    allData.forEach(item => {
+        if (String(item.bid_start||'').startsWith(today)) {
+            kws.forEach(kw => { if ((item.notice_title||'').includes(kw)) DB.addNotification(`새 입찰공고: ${item.notice_title}`, kw); });
         }
     });
     updateNotificationBadge();
-}
-
-// ===== 페이지 전환 =====
-function showPage(id) {
-    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if (id !== 'mypage') resetKeywordEditMode();
-    if (id === 'mypage') { resetKeywordEditMode(); loadMyPage(); }
-    if (id === 'bid')    { updateBidStats(); }
 }
 
 // ===== 회원가입 =====
 function openSignupModal()  { document.getElementById('signupModal').classList.add('show'); }
 function closeSignupModal() {
     document.getElementById('signupModal').classList.remove('show');
-    ['signupId','signupPassword','signupPasswordConfirm','signupEmail','signupPhone'].forEach(id=>{ document.getElementById(id).value=''; });
+    ['signupId','signupPassword','signupPasswordConfirm','signupEmail','signupPhone'].forEach(id => { document.getElementById(id).value = ''; });
 }
 function handleSignup() {
-    const id=document.getElementById('signupId').value.trim();
-    const pw=document.getElementById('signupPassword').value;
-    const pwc=document.getElementById('signupPasswordConfirm').value;
-    const email=document.getElementById('signupEmail').value.trim();
+    const id=document.getElementById('signupId').value.trim(), pw=document.getElementById('signupPassword').value;
+    const pwc=document.getElementById('signupPasswordConfirm').value, email=document.getElementById('signupEmail').value.trim();
     const phone=document.getElementById('signupPhone').value.trim();
     if (!id||!pw||!email||!phone) { showAlert('모든 항목을 입력해주세요.'); return; }
     if (pw!==pwc) { showAlert('비밀번호가 일치하지 않습니다.'); return; }
@@ -385,8 +318,7 @@ function handleSignup() {
 
 // ===== 로그인/로그아웃 =====
 function handleLogin() {
-    const id=document.getElementById('loginId').value.trim();
-    const pw=document.getElementById('loginPassword').value;
+    const id=document.getElementById('loginId').value.trim(), pw=document.getElementById('loginPassword').value;
     if (!id||!pw) { showAlert('아이디와 비밀번호를 입력해주세요.'); return; }
     const user=DB.findUser(id,pw);
     if (user) {
@@ -436,12 +368,12 @@ let isEditMode=false, originalEmail='', originalPhone='';
 function toggleEditMode() {
     isEditMode=!isEditMode;
     const em=document.getElementById('userEmailDisplay'), pm=document.getElementById('userPhoneDisplay');
-    document.getElementById('editBtn').style.display    = isEditMode?'none':'block';
-    document.getElementById('editButtons').style.display = isEditMode?'block':'none';
+    document.getElementById('editBtn').style.display=isEditMode?'none':'block';
+    document.getElementById('editButtons').style.display=isEditMode?'block':'none';
     if (isEditMode) {
         originalEmail=em.textContent; originalPhone=pm.textContent;
         em.innerHTML=`<input type="email" id="editEmail" value="${originalEmail}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">`;
-        pm.innerHTML=`<input type="tel"   id="editPhone" value="${originalPhone}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">`;
+        pm.innerHTML=`<input type="tel" id="editPhone" value="${originalPhone}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">`;
     }
 }
 function cancelEdit() {
@@ -454,10 +386,7 @@ function cancelEdit() {
 function saveUserInfo() {
     const ne=document.getElementById('editEmail').value.trim(), np=document.getElementById('editPhone').value.trim();
     if (!ne||!np) { showAlert('이메일과 전화번호를 모두 입력해주세요.'); return; }
-    if (DB.currentUser) {
-        const u=DB.users.find(u=>u.id===DB.currentUser.id);
-        if (u) { u.email=ne; u.phone=np; DB.currentUser.email=ne; DB.currentUser.phone=np; DB.save(); }
-    }
+    if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.email=ne; u.phone=np; DB.currentUser.email=ne; DB.currentUser.phone=np; DB.save(); } }
     isEditMode=false;
     document.getElementById('editBtn').style.display='block';
     document.getElementById('editButtons').style.display='none';
@@ -482,14 +411,14 @@ function loadMypageKeywordList() {
 function toggleKeywordCheck(kw,checked) { DB.setKeywordCheck(kw,checked); loadMypageKeywordList(); }
 function toggleKeywordEditMode() {
     isKeywordEditMode=!isKeywordEditMode;
-    const eb=document.getElementById('keywordEditBtn'), bd=document.getElementById('keywordBulkDeleteBtn'), ab=document.getElementById('keywordAddBtn');
+    const eb=document.getElementById('keywordEditBtn'),bd=document.getElementById('keywordBulkDeleteBtn'),ab=document.getElementById('keywordAddBtn');
     if (isKeywordEditMode) { eb.textContent='확인'; eb.className='btn-confirm'; bd.style.display='block'; ab.classList.add('show'); }
     else { eb.textContent='수정'; eb.className='btn-edit'; bd.style.display='none'; ab.classList.remove('show'); }
     loadMypageKeywordList();
 }
 function resetKeywordEditMode() {
     isKeywordEditMode=false;
-    const eb=document.getElementById('keywordEditBtn'), bd=document.getElementById('keywordBulkDeleteBtn'), ab=document.getElementById('keywordAddBtn');
+    const eb=document.getElementById('keywordEditBtn'),bd=document.getElementById('keywordBulkDeleteBtn'),ab=document.getElementById('keywordAddBtn');
     if(eb){eb.textContent='수정';eb.className='btn-edit';} if(bd)bd.style.display='none'; if(ab)ab.classList.remove('show');
 }
 function showKeywordInputBox() { document.getElementById('mypageKeywordInput').focus(); }
@@ -506,10 +435,7 @@ function loadNotifications() {
         </div>`).join('');
 }
 function deleteNotification(index) {
-    if (DB.currentUser) {
-        const u=DB.users.find(u=>u.id===DB.currentUser.id);
-        if (u) { u.notifications.splice(index,1); DB.save(); loadNotifications(); }
-    }
+    if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.notifications.splice(index,1); DB.save(); loadNotifications(); } }
 }
 function addMypageKeyword() {
     const input=document.getElementById('mypageKeywordInput'), val=input.value.trim();
