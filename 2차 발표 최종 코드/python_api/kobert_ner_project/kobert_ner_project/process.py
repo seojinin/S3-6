@@ -4,8 +4,10 @@ import pandas as pd
 import pdfplumber
 import requests
 import tempfile
+import zipfile
 
 from tika import parser
+from lxml import etree
 
 
 ########################################
@@ -25,6 +27,7 @@ CHAPTER_PATTERNS = [
     r"^\s*[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.?",
     r"^\s*\d+\.\d+(\.\d+)?\s+",
     r"^\s*[●■◆▶]\s*",
+    r"^\s*제\s*\d+\s*장",
 ]
 
 
@@ -133,70 +136,10 @@ def extract_by_chapter(text: str):
 
 
 ########################################
-# ===== PDF =====
-########################################
-
-def extract_pdf(file_path):
-
-    full_text = []
-
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                full_text.append(text)
-
-    combined_text = "\n".join(full_text)
-
-    return extract_by_chapter(combined_text)
-
-
-########################################
-# ===== Excel =====
-########################################
-
-def extract_excel(file_path):
-    
-    output = []
-
-    with pd.ExcelFile(file_path) as xls:
-
-        for sheet in xls.sheet_names:
-
-            if match_chapter_title(sheet):
-
-                df = pd.read_excel(xls, sheet_name=sheet)
-
-                output.append(df.to_csv(sep="\t", index=False))
-
-    return output
-
-
-########################################
-# ===== HWP/HWPX =====
-########################################
-
-def extract_hwp_like(file_path):
-    try:
-        parsed = parser.from_file(file_path)
-        text = parsed.get("content", "") or ""
-
-        if not text.strip():
-            return []
-
-        return extract_by_chapter(text)
-
-    except Exception as e:
-        print(f"HWP/HWPX 파싱 오류: {e}")
-        return []
-
-
-########################################
 # ===== 문장 분리 =====
 ########################################
 
 def split_sentences(lines):
-
     sentences = []
     num = 1
 
@@ -228,6 +171,217 @@ def split_sentences(lines):
             num += 1
 
     return sentences
+
+
+# ========================================
+# ===== Excel =====
+# ========================================
+
+def extract_excel(file_path):
+
+    output = []
+
+    try:
+
+        ext = os.path.splitext(file_path)[1].lower()
+
+        # 확장자별 엔진 선택
+        if ext == ".xls":
+            engine = "xlrd"
+        else:
+            engine = "openpyxl"
+
+        xls = pd.ExcelFile(
+            file_path,
+            engine=engine
+        )
+
+        for sheet in xls.sheet_names:
+
+            df = pd.read_excel(
+                xls,
+                sheet_name=sheet,
+                header=None,
+                dtype=str
+            )
+
+            df = df.fillna("")
+
+            for row in df.values:
+
+                row_text = " | ".join(
+                    str(cell).strip()
+                    for cell in row
+                    if str(cell).strip()
+                )
+
+                if row_text:
+                    output.append(row_text)
+
+        print(f"[EXCEL] extracted rows: {len(output)}")
+
+    except Exception as e:
+
+        print(f"[ERROR] Excel extraction failed: {file_path}")
+        print(e)
+
+    return output
+
+    
+########################################
+# ===== PDF =====
+########################################
+
+def extract_pdf(file_path):
+    full_text = []
+
+    try:
+
+        with pdfplumber.open(file_path) as pdf:
+
+            for page in pdf.pages:
+
+                text = page.extract_text()
+
+                if text:
+                    full_text.append(text)
+
+    except Exception as e:
+
+        print(f"[ERROR] PDF extraction failed: {file_path} / {e}")
+
+    combined_text = "\n".join(full_text)
+
+    return extract_by_chapter(combined_text)
+
+
+
+# ========================================
+# ===== HWP =====
+# ========================================
+
+def extract_hwp(file_path):
+
+    try:
+
+        parsed = parser.from_file(file_path)
+
+        text = parsed.get("content", "") or ""
+
+        if not text.strip():
+
+            print(f"[WARN] No content extracted: {file_path}")
+
+            return []
+
+        return extract_by_chapter(text)
+
+    except Exception as e:
+
+        print(f"[ERROR] HWP extraction failed: {file_path} / {e}")
+
+        return []
+
+
+# ========================================
+# ===== HWPX =====
+# ========================================
+
+def extract_hwpx(file_path):
+
+    normal_lines = []
+    table_lines = []
+
+    try:
+
+        with zipfile.ZipFile(file_path, 'r') as z:
+
+            xml_files = [
+                f for f in z.namelist()
+                if f.endswith(".xml")
+            ]
+
+            for xml_file in xml_files:
+
+                with z.open(xml_file) as f:
+
+                    tree = etree.parse(f)
+
+                    root = tree.getroot()
+
+                    # 일반 텍스트
+                    # 일반 문단 처리
+                    paragraphs = root.xpath(
+                        "//*[local-name()='p']"
+                    )
+
+                    for para in paragraphs:
+
+                        texts = para.xpath(
+                            ".//*[local-name()='t']/text()"
+                        )
+
+                        merged = "".join(
+                            t
+                            for t in texts
+                            if t.strip()
+                        ).strip()
+
+                        if merged:
+                            normal_lines.append(merged)
+
+                    # 표 처리
+                    tables = root.xpath(
+                        "//*[local-name()='tbl']"
+                    )
+
+                    for table in tables:
+
+                        rows = table.xpath(
+                            ".//*[local-name()='tr']"
+                        )
+
+                        for row in rows:
+
+                            cells = row.xpath(
+                                ".//*[local-name()='tc']"
+                            )
+
+                            cell_texts = []
+
+                            for cell in cells:
+
+                                texts = cell.xpath(
+                                    ".//*[local-name()='t']/text()"
+                                )
+
+                                merged = " ".join(
+                                    t.strip()
+                                    for t in texts
+                                    if t.strip()
+                                )
+
+                                if merged:
+                                    cell_texts.append(merged)
+
+                            if cell_texts:
+
+                                # 표는 그대로 유지
+                                row_sentence = " | ".join(cell_texts)
+
+                                table_lines.append(row_sentence)
+
+    except Exception as e:
+
+        print(f"[ERROR] HWPX extraction failed: {file_path} / {e}")
+
+    combined_text = "\n".join(normal_lines)
+
+    filtered_lines = extract_by_chapter(
+        combined_text
+    )
+
+    return filtered_lines, table_lines
 
 
 ########################################
@@ -269,13 +423,18 @@ def process_file(data):
             elif ext in [".xls", ".xlsx"]:
                 lines = extract_excel(tmp_path)
 
-            elif ext in [".hwp", ".hwpx"]:
-                lines = extract_hwp_like(tmp_path)
+                        elif ext == ".hwp":
+                lines = extract_hwp(path)
+                sentences = split_sentences(lines)
+
+            elif ext == ".hwpx":
+                normal_lines, table_lines = extract_hwpx(path)
+                sentences = split_sentences(normal_lines)
+
+                sentences.extend(table_lines)
 
             else:
-                lines = []
-
-            sentences = split_sentences(lines)
+                sentences = []
 
             results.append({
                 "bidNtceNo": bid_id,
