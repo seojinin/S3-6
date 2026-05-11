@@ -34,9 +34,10 @@ header {
 
 nav a {
     margin-left: 24px;
+    margin-right: 10px;
     text-decoration: none;
     color: #444;
-    font-size: 14px;
+    font-size: 17px;
     cursor: pointer;
 }
 
