@@ -205,6 +205,6 @@ class NERInferencer:
         return {
             "bidNtceNo": input_json.get("bidNtceNo"),
             "ntceSpecFileNm": input_json.get("ntceSpecFileNm"),
-            "ntceSpecDocUrl": input_json.get("file_url"),
+            "ntceSpecDocUrl": input_json.get("ntceSpecDocUrl"),
             "sentences": result_sentences
         }
