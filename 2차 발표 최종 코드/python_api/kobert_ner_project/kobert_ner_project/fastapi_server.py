@@ -39,7 +39,7 @@ def process_bid(data: dict):
                     "type": kw["type"],
                     "fileName": file_name,
                     "noticeNumber": bid_no,
-                    "ntceSpecDocUrl": file_url
+                    "fileUrl": file_url
                 })
 
         payload = {
