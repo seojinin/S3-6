@@ -28,7 +28,8 @@ def process_bid(data: dict):
 
         bid_no = ner_result["bidNtceNo"]
         file_name = ner_result["ntceSpecFileNm"]
-
+        file_url = ner_result["ntceSpecDocUrl"]
+        
         entities = []
 
         for s in ner_result["sentences"]:
