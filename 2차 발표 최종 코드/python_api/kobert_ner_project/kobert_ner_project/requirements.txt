@@ -7,3 +7,7 @@ safetensors
 pandas
 pdfplumber
 openpyxl
+tika
+lxml
+requests
+xlrd
