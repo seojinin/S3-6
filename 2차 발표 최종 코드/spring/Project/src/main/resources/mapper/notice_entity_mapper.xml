@@ -23,11 +23,21 @@
 	</select>
 
 	<!-- 키워드 검색 -->
+	<!-- 공고명(제목) 또는 NER 엔티티 값으로 통합 검색 -->
 	<select id="searchByKeyword" resultType="pj.notice.model.NoticeEntityModel">
-    	SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type, e.file_name, n.notice_title, e.file_url
-    	FROM tb_notice_entity e
-    	JOIN tb_notice n ON e.notice_number = n.notice_number
-    	WHERE e.entity_value LIKE CONCAT('%', #{keyword}, '%')
+	    SELECT DISTINCT 
+	        e.entity_id, 
+	        e.notice_number, 
+	        e.entity_value, 
+	        e.entity_type, 
+	        e.file_name, 
+	        n.notice_title, 
+	        e.file_url
+	    FROM tb_notice n
+	    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+	    WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%') -- 제목 검색
+	       OR e.entity_value LIKE CONCAT('%', #{keyword}, '%') -- NER 키워드 검색
+	    ORDER BY n.created_at DESC
 	</select>
 	
 	<!-- 키워드 사전 저장(없을 때) -->

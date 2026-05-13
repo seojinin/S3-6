@@ -18,8 +18,13 @@
 		where notice_id = #{notice_id}
 	</select>
 
+	<!-- 키워드 검색도 가능하게 하려고 수정 -->
 	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
-		select *
-		from tb_notice
+	    SELECT 
+	        n.*,
+	        (SELECT GROUP_CONCAT(e.entity_value SEPARATOR ', ') 
+	         FROM tb_notice_entity e 
+	         WHERE e.notice_number = n.notice_number) AS entity_value
+	    FROM tb_notice n
 	</select>
 </mapper>

@@ -158,8 +158,7 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 					result.put("agency", node.path("ntceInsttNm").asText());
 					result.put("demand_agency", node.path("dminsttNm").asText());
 					result.put("notice_date", node.path("bidNtceDt").asText());
-					result.put("opening_date", node.path("opengDt").asText()); 
-					
+					result.put("opening_date", node.path("opengDt").asText());
 
 					// 금액 변환
 					String amtStr = node.path("bdgtAmt").asText();
