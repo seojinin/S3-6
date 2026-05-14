@@ -35,27 +35,15 @@ const DB = {
             if (u) { if (!u.keywordChecks) u.keywordChecks = {}; u.keywordChecks[keyword] = checked; this.save(); }
         }
     },
-    addNotification(message, keyword, noticeNumber = null) {
+    addNotification(message, keyword) {
         if (this.currentUser) {
             const u = this.users.find(u => u.id === this.currentUser.id);
             if (u) {
                 const now = new Date();
                 const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                u.notifications.push({ message, keyword, date: d, read: false, noticeNumber, starred: false });
+                u.notifications.push({ message, keyword, date: d });
                 this.save();
             }
-        }
-    },
-    markAsRead(index) {
-        if (this.currentUser) {
-            const u = this.users.find(u => u.id === this.currentUser.id);
-            if (u && u.notifications[index]) { u.notifications[index].read = true; this.save(); }
-        }
-    },
-    toggleStar(index) {
-        if (this.currentUser) {
-            const u = this.users.find(u => u.id === this.currentUser.id);
-            if (u && u.notifications[index]) { u.notifications[index].starred = !u.notifications[index].starred; this.save(); }
         }
     },
     getNotifications() {
@@ -97,6 +85,7 @@ function restoreBidState() {
 
 // ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
+    history.replaceState({ page: 'main' }, '', '#main');
     fetchBidList();
 });
 
@@ -122,10 +111,20 @@ async function fetchBidList(page = 1) {
     }
 }
 
+// !!수정!!
 // ===== 검색 필터 적용 =====
 function applySearchFilter() {
     const searchTerm = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
-    apiData    = searchTerm ? allData.filter(item => (item.notice_title || '').toLowerCase().includes(searchTerm)) : allData;
+    
+    apiData = searchTerm ? allData.filter(item => {
+        const title = (item.notice_title || '').toLowerCase();
+        // 백엔드에서 GROUP_CONCAT으로 합쳐서 보내주는 키워드 필드
+        const keywords = (item.entity_value || '').toLowerCase(); 
+        
+        // 제목이나 키워드 중 하나라도 검색어를 포함하면 true
+        return title.includes(searchTerm) || keywords.includes(searchTerm);
+    }) : allData;
+    
     totalCount = apiData.length;
 }
 
@@ -146,6 +145,8 @@ function formatDate(val) {
     return val;
 }
 
+
+// !!수정!!
 // ===== 테이블 렌더링 =====
 function renderBidTable() {
     const table = document.getElementById('bidTable');
@@ -166,7 +167,14 @@ function renderBidTable() {
         const item = apiData[i];
         const row  = table.insertRow();
         row.style.cursor = 'pointer';
-        row.onclick = () => { saveBidState(); showBidDetail(item.notice_number); };
+        
+        // 행 전체 클릭 시 상세 페이지로 이동 (단, 파일 링크 클릭 시에는 방해 안 되게 처리 필요)
+        row.onclick = (e) => { 
+            if(e.target.tagName !== 'A') { // 클릭한 게 링크(A태그)가 아닐 때만 상세페이지로
+                saveBidState(); 
+                showBidDetail(item.notice_number); 
+            }
+        };
 
         row.insertCell(0).textContent = i + 1;
 
@@ -182,7 +190,26 @@ function renderBidTable() {
         row.insertCell(3).textContent = formatAmount(item.amount);
         row.insertCell(4).textContent = item.region           || '-';
         row.insertCell(5).textContent = item.agency           || '-';
-        row.insertCell(6).textContent = '-';
+
+        // --- 수정된 부분: 첨부파일 칸 (6번 인덱스) ---
+        const fileCell = row.insertCell(6);
+        
+        // 데이터에 파일 정보가 있는지 확인 (백엔드에서 '| ' 구분자로 합쳐서 보낸다고 가정)
+        if (item.file_name && item.file_url) {
+            const names = item.file_name.split('| ');
+            const urls = item.file_url.split('| ');
+            
+            let fileLinksHtml = '';
+            names.forEach((name, idx) => {
+                const url = urls[idx] || '#';
+                // 파일 아이콘과 함께 짧게 표시 (여러 개일 경우 첫 번째 파일 위주로 표시하거나 아이콘화 가능)
+                fileLinksHtml += `<a href="${url}" target="_blank" title="${name}" style="color:#2563eb; text-decoration:none; margin-right:5px;">💾</a>`;
+            });
+            fileCell.innerHTML = fileLinksHtml;
+        } else {
+            fileCell.textContent = '-';
+        }
+        // ------------------------------------------
     }
 }
 
@@ -203,24 +230,52 @@ function renderMainBidTable() {
     });
 }
 
+// !!수정!!
 // ===== 상세 페이지 =====
-function showBidDetail(noticeNumber) {
+async function showBidDetail(noticeNumber) {
     showPage('bidDetail');
 
-    const item = allData.find(i => i.notice_number === noticeNumber);
-    if (!item) return;
+    try {
+        // 1. 네가 만든 백엔드 상세 API 호출!
+        const res = await fetch(`http://localhost:8080/api/notices/${noticeNumber}/detail`);
+        const data = await res.json();
 
-    document.getElementById('detailTitle').textContent      = item.notice_title    || '-';
-    document.getElementById('detailNtceNo').textContent     = item.notice_number   || '-';
-    document.getElementById('detailMethod').textContent     = item.contract_method || '-';
-    document.getElementById('detailDminstt').textContent    = item.agency          || '-';
-    document.getElementById('detailDmndInstt').textContent  = item.demand_agency   || '-';
-    document.getElementById('detailAmount').textContent     = formatAmount(item.amount);
-    document.getElementById('detailNtceDate').textContent   = formatDate(item.bid_start);
-    document.getElementById('detailOpengDate').textContent  = formatDate(item.bid_end);
-    document.getElementById('detailBizType').textContent    = item.contract_method || '-';
-    document.getElementById('detailRegion').textContent     = item.region          || '-';
-    document.getElementById('detailFiles').textContent      = '-';
+        // 2. 기본 정보 렌더링
+        document.getElementById('detailTitle').textContent      = data.notice_title    || '-';
+        document.getElementById('detailNtceNo').textContent     = data.notice_number   || '-';
+        document.getElementById('detailMethod').textContent     = data.contract_method || '-';
+        document.getElementById('detailDminstt').textContent    = data.agency          || '-';
+        document.getElementById('detailDmndInstt').textContent  = data.demand_agency   || '-';
+        document.getElementById('detailAmount').textContent     = formatAmount(data.amount);
+        document.getElementById('detailNtceDate').textContent   = formatDate(data.bid_start);
+        document.getElementById('detailOpengDate').textContent  = formatDate(data.bid_end);
+        document.getElementById('detailBizType').textContent    = data.biz_type        || '-';
+        document.getElementById('detailRegion').textContent     = data.region          || '-';
+
+        // 3. 첨부파일 렌더링 (핵심!)
+        const fileContainer = document.getElementById('detailFiles');
+        fileContainer.innerHTML = ''; // 기존 하드코딩 텍스트 초기화
+
+        if (data.files && data.files.length > 0) {
+            data.files.forEach(file => {
+                const fileLink = document.createElement('a');
+                fileLink.href = file.fileUrl;
+                fileLink.textContent = `💾 ${file.fileName}`;
+                fileLink.target = '_blank'; // 클릭 시 새 창에서 파일 열기/다운로드
+                fileLink.style.display = 'block'; // 파일이 여러 개일 경우 세로로 나열
+                fileLink.style.marginBottom = '5px';
+                fileLink.style.color = '#2563eb';
+                fileLink.style.textDecoration = 'none';
+                
+                fileContainer.appendChild(fileLink);
+            });
+        } else {
+            fileContainer.textContent = '첨부파일 없음';
+        }
+    } catch (e) {
+        console.error('상세 정보 로드 실패:', e);
+        document.getElementById('detailFiles').textContent = '상세 정보를 불러올 수 없습니다.';
+    }
 }
 
 // ===== 페이지네이션 =====
@@ -267,13 +322,22 @@ function clearFilters() {
 }
 
 // ===== 페이지 전환 =====
-function showPage(id) {
+function showPage(id, pushHistory = true) {
     document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if (id !== 'mypage') resetKeywordEditMode();
     if (id === 'mypage') { resetKeywordEditMode(); loadMyPage(); }
     if (id === 'bid')    { if (!restoreBidState()) updateBidStats(); }
+
+    // 브라우저 히스토리에 현재 페이지 등록
+    if (pushHistory) history.pushState({ page: id }, '', '#' + id);
 }
+
+// 브라우저 뒤로가기/앞으로가기 감지
+window.addEventListener('popstate', (e) => {
+    const id = e.state?.page || 'main';
+    showPage(id, false);
+});
 
 // ===== 로딩/에러 =====
 function showTableLoading(tableId, cols) {
@@ -289,14 +353,25 @@ function showTableError(tableId, cols, msg) {
     cell.colSpan = cols; cell.style.cssText = 'text-align:center;padding:40px;color:#ef4444;'; cell.textContent = msg;
 }
 
+// !!수정!!
 // ===== 키워드 알림 체크 =====
 function checkNewBidsForKeywords() {
     if (!DB.currentUser) return;
     const kws = DB.getUserKeywords();
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
+
     allData.forEach(item => {
-        if (String(item.bid_start||'').startsWith(today)) {
-            kws.forEach(kw => { if ((item.notice_title||'').includes(kw)) DB.addNotification(`새 입찰공고: ${item.notice_title}`, kw, item.notice_number); });
+        // 오늘 올라온 공고인 경우
+        if (String(item.bid_start || '').startsWith(today)) {
+            kws.forEach(kw => {
+                const titleMatch = (item.notice_title || '').includes(kw);
+                const keywordMatch = (item.entity_value || '').includes(kw);
+                
+                // 제목 또는 AI 키워드 리스트에 내 관심 키워드가 있다면 알림 추가
+                if (titleMatch || keywordMatch) {
+                    DB.addNotification(`새 입찰공고(매칭): ${item.notice_title}`, kw);
+                }
+            });
         }
     });
     updateNotificationBadge();
@@ -431,25 +506,10 @@ function loadNotifications() {
     const notis=DB.getNotifications(), container=document.getElementById('notificationList');
     if (notis.length===0) { container.innerHTML='<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>'; return; }
     container.innerHTML=notis.map((n,i)=>`
-        <div class="notification-item ${n.read?'read':'unread'}" >
-            <div class="noti-content" onclick="clickNotification(${i})" style="cursor:pointer;flex:1">
-                새로운 입찰공고가 올라왔습니다. - <strong>${n.keyword}</strong>
-                <span class="date">${n.date}</span>
-            </div>
-            <button class="star-noti ${n.starred?'starred':''}" onclick="toggleStarNotification(${i})" title="즐겨찾기">★</button>
+        <div class="notification-item">새로운 입찰공고가 올라왔습니다. - <strong>${n.keyword}</strong>
+            <span class="date">${n.date}</span>
             <button class="delete-noti" onclick="deleteNotification(${i})" title="삭제">×</button>
         </div>`).join('');
-}
-function clickNotification(index) {
-    DB.markAsRead(index);
-    const n = DB.getNotifications()[index];
-    loadNotifications();
-    updateNotificationBadge();
-    if (n.noticeNumber) { showPage('bid'); setTimeout(() => showBidDetail(n.noticeNumber), 100); }
-}
-function toggleStarNotification(index) {
-    DB.toggleStar(index);
-    loadNotifications();
 }
 function deleteNotification(index) {
     if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.notifications.splice(index,1); DB.save(); loadNotifications(); } }
@@ -482,7 +542,7 @@ function confirmAction()   { if (bulkDeleteCallback) { const cb=bulkDeleteCallba
 
 // ===== 알림 =====
 function updateNotificationBadge() {
-    const n=DB.getNotifications().filter(n=>!n.read), badge=document.getElementById('notificationBadge');
+    const n=DB.getNotifications(), badge=document.getElementById('notificationBadge');
     badge.textContent=n.length; badge.style.display=n.length===0?'none':'flex';
 }
 function toggleNotificationDropdown() {
@@ -492,11 +552,7 @@ function toggleNotificationDropdown() {
 function loadNotificationDropdown() {
     const notis=DB.getNotifications(), c=document.getElementById('notificationDropdownContent');
     if (notis.length===0) { c.innerHTML='<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>'; return; }
-    c.innerHTML=notis.slice(0,5).map((n,i)=>`
-        <div class="notification-dropdown-item ${n.read?'read':'unread'}" onclick="clickNotification(${i}); toggleNotificationDropdown()" style="cursor:pointer">
-            <strong>${n.keyword}</strong> 키워드와 매칭되는 새 공고<br>
-            <span style="font-size:11px;color:#9ca3af;">${n.date}</span>
-        </div>`).join('');
+    c.innerHTML=notis.slice(0,5).map(n=>`<div class="notification-dropdown-item"><strong>${n.keyword}</strong> 키워드와 매칭되는 새 공고<br><span style="font-size:11px;color:#9ca3af;">${n.date}</span></div>`).join('');
 }
 document.addEventListener('click', e => {
     const d=document.getElementById('notificationDropdown'), bell=document.getElementById('notificationBell');
