@@ -6,10 +6,10 @@
 <mapper namespace="pj.notice.mapper.NoticeMapper">
 
 	<insert id="insertNotice">
-	    insert ignore into tb_notice
-	    (notice_number, notice_title, contract_method, amount, agency, region, demand_agency)
-	    values
-	    (#{notice_number}, #{notice_title}, #{contract_method}, #{amount}, #{agency}, #{region}, #{demand_agency})
+    	insert ignore into tb_notice
+    	(notice_number, notice_title, contract_method, amount, agency, region, demand_agency, bid_start, bid_end)
+    	values
+    	(#{notice_number}, #{notice_title}, #{contract_method}, #{amount}, #{agency}, #{region}, #{demand_agency}, #{bid_start}, #{bid_end})
 	</insert>
 
 	<select id="selectNoticeById" resultType="pj.notice.model.NoticeModel">
@@ -18,13 +18,8 @@
 		where notice_id = #{notice_id}
 	</select>
 
-	<!-- 키워드 검색도 가능하게 하려고 수정 -->
 	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
-	    SELECT 
-	        n.*,
-	        (SELECT GROUP_CONCAT(e.entity_value SEPARATOR ', ') 
-	         FROM tb_notice_entity e 
-	         WHERE e.notice_number = n.notice_number) AS entity_value
-	    FROM tb_notice n
+		select *
+		from tb_notice
 	</select>
 </mapper>
