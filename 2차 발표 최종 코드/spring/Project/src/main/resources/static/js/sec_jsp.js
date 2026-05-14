@@ -35,15 +35,27 @@ const DB = {
             if (u) { if (!u.keywordChecks) u.keywordChecks = {}; u.keywordChecks[keyword] = checked; this.save(); }
         }
     },
-    addNotification(message, keyword) {
+    addNotification(message, keyword, noticeNumber = null) {
         if (this.currentUser) {
             const u = this.users.find(u => u.id === this.currentUser.id);
             if (u) {
                 const now = new Date();
                 const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                u.notifications.push({ message, keyword, date: d });
+                u.notifications.push({ message, keyword, date: d, read: false, noticeNumber, starred: false });
                 this.save();
             }
+        }
+    },
+    markAsRead(index) {
+        if (this.currentUser) {
+            const u = this.users.find(u => u.id === this.currentUser.id);
+            if (u && u.notifications[index]) { u.notifications[index].read = true; this.save(); }
+        }
+    },
+    toggleStar(index) {
+        if (this.currentUser) {
+            const u = this.users.find(u => u.id === this.currentUser.id);
+            if (u && u.notifications[index]) { u.notifications[index].starred = !u.notifications[index].starred; this.save(); }
         }
     },
     getNotifications() {
@@ -85,7 +97,6 @@ function restoreBidState() {
 
 // ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
-    history.replaceState({ page: 'main' }, '', '#main');
     fetchBidList();
 });
 
@@ -256,22 +267,13 @@ function clearFilters() {
 }
 
 // ===== 페이지 전환 =====
-function showPage(id, pushHistory = true) {
+function showPage(id) {
     document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if (id !== 'mypage') resetKeywordEditMode();
     if (id === 'mypage') { resetKeywordEditMode(); loadMyPage(); }
     if (id === 'bid')    { if (!restoreBidState()) updateBidStats(); }
-
-    // 브라우저 히스토리에 현재 페이지 등록
-    if (pushHistory) history.pushState({ page: id }, '', '#' + id);
 }
-
-// 브라우저 뒤로가기/앞으로가기 감지
-window.addEventListener('popstate', (e) => {
-    const id = e.state?.page || 'main';
-    showPage(id, false);
-});
 
 // ===== 로딩/에러 =====
 function showTableLoading(tableId, cols) {
@@ -294,7 +296,7 @@ function checkNewBidsForKeywords() {
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
     allData.forEach(item => {
         if (String(item.bid_start||'').startsWith(today)) {
-            kws.forEach(kw => { if ((item.notice_title||'').includes(kw)) DB.addNotification(`새 입찰공고: ${item.notice_title}`, kw); });
+            kws.forEach(kw => { if ((item.notice_title||'').includes(kw)) DB.addNotification(`새 입찰공고: ${item.notice_title}`, kw, item.notice_number); });
         }
     });
     updateNotificationBadge();
@@ -429,10 +431,25 @@ function loadNotifications() {
     const notis=DB.getNotifications(), container=document.getElementById('notificationList');
     if (notis.length===0) { container.innerHTML='<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>'; return; }
     container.innerHTML=notis.map((n,i)=>`
-        <div class="notification-item">새로운 입찰공고가 올라왔습니다. - <strong>${n.keyword}</strong>
-            <span class="date">${n.date}</span>
+        <div class="notification-item ${n.read?'read':'unread'}" >
+            <div class="noti-content" onclick="clickNotification(${i})" style="cursor:pointer;flex:1">
+                새로운 입찰공고가 올라왔습니다. - <strong>${n.keyword}</strong>
+                <span class="date">${n.date}</span>
+            </div>
+            <button class="star-noti ${n.starred?'starred':''}" onclick="toggleStarNotification(${i})" title="즐겨찾기">★</button>
             <button class="delete-noti" onclick="deleteNotification(${i})" title="삭제">×</button>
         </div>`).join('');
+}
+function clickNotification(index) {
+    DB.markAsRead(index);
+    const n = DB.getNotifications()[index];
+    loadNotifications();
+    updateNotificationBadge();
+    if (n.noticeNumber) { showPage('bid'); setTimeout(() => showBidDetail(n.noticeNumber), 100); }
+}
+function toggleStarNotification(index) {
+    DB.toggleStar(index);
+    loadNotifications();
 }
 function deleteNotification(index) {
     if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.notifications.splice(index,1); DB.save(); loadNotifications(); } }
@@ -465,7 +482,7 @@ function confirmAction()   { if (bulkDeleteCallback) { const cb=bulkDeleteCallba
 
 // ===== 알림 =====
 function updateNotificationBadge() {
-    const n=DB.getNotifications(), badge=document.getElementById('notificationBadge');
+    const n=DB.getNotifications().filter(n=>!n.read), badge=document.getElementById('notificationBadge');
     badge.textContent=n.length; badge.style.display=n.length===0?'none':'flex';
 }
 function toggleNotificationDropdown() {
@@ -475,7 +492,11 @@ function toggleNotificationDropdown() {
 function loadNotificationDropdown() {
     const notis=DB.getNotifications(), c=document.getElementById('notificationDropdownContent');
     if (notis.length===0) { c.innerHTML='<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>'; return; }
-    c.innerHTML=notis.slice(0,5).map(n=>`<div class="notification-dropdown-item"><strong>${n.keyword}</strong> 키워드와 매칭되는 새 공고<br><span style="font-size:11px;color:#9ca3af;">${n.date}</span></div>`).join('');
+    c.innerHTML=notis.slice(0,5).map((n,i)=>`
+        <div class="notification-dropdown-item ${n.read?'read':'unread'}" onclick="clickNotification(${i}); toggleNotificationDropdown()" style="cursor:pointer">
+            <strong>${n.keyword}</strong> 키워드와 매칭되는 새 공고<br>
+            <span style="font-size:11px;color:#9ca3af;">${n.date}</span>
+        </div>`).join('');
 }
 document.addEventListener('click', e => {
     const d=document.getElementById('notificationDropdown'), bell=document.getElementById('notificationBell');
