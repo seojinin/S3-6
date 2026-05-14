@@ -15,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import pj.notice.mapper.NoticeMapper;
 import pj.notice.model.NoticeModel;
 import pj.notice.dto.FileInfoDto;
-
+import java.time.LocalDateTime;
 @Service
 public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
@@ -74,6 +74,27 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 			notice.setAgency(node.path("ntceInsttNm").asText());
 			notice.setDemand_agency(node.path("dminsttNm").asText());
 			notice.setRegion(node.path("cnstrtsiteRgnNm").asText());
+			// ↓ 여기서부터 추가/교체
+			String bidStartStr = node.path("bidNtceDt").asText().trim();
+			String bidEndStr   = node.path("opengDt").asText().trim();
+
+			try {
+			    if (bidStartStr.length() >= 8) {
+			        String s = bidStartStr.replaceAll("[^0-9]", "");
+			        String formatted = s.substring(0,4)+"-"+s.substring(4,6)+"-"+s.substring(6,8)+"T00:00";
+			        notice.setBid_start(LocalDateTime.parse(formatted));
+			    }
+			} catch (Exception e) { notice.setBid_start(null); }
+
+			try {
+			    if (bidEndStr.length() >= 8) {
+			        String s = bidEndStr.replaceAll("[^0-9]", "");
+			        String formatted = s.substring(0,4)+"-"+s.substring(4,6)+"-"+s.substring(6,8)+"T00:00";
+			        notice.setBid_end(LocalDateTime.parse(formatted));
+			    }
+			} catch (Exception e) { notice.setBid_end(null); }
+
+			noticeMapper.insertNotice(notice);
 
 			noticeMapper.insertNotice(notice);
 
