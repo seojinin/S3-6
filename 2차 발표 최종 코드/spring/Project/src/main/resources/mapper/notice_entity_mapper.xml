@@ -57,5 +57,10 @@
 		INSERT IGNORE INTO tb_notice_keyword_map (notice_number, keyword_id, entity_type, file_name)
 		VALUES(#{notice_number}, #{keyword_id}, #{entity_type}, #{file_name})
 	</insert>
+	
+	<!-- 키워드 ID로 해당 키워드를 등록한 회원 조회 -->
+	<select id="selectMembersByKeywordId" resultType="long">
+	    SELECT member_id FROM tb_member_keyword WHERE keyword_id = #{keywordId}
+	</select>
 
 </mapper>

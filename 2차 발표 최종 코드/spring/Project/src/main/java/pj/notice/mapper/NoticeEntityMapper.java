@@ -25,4 +25,8 @@ public interface NoticeEntityMapper {
 
 	// 공고-키워드 매핑 저장
 	void insertNoticeKeywordMap(NoticeKeywordMapModel model);
+
+	// 특정 키워드를 관심 키워드로 등록한 회원 ID 리스트 조회 (알림 발송용)
+	List<Long> selectMembersByKeywordId(@Param("keywordId") Long keywordId);
+
 }

@@ -1,7 +1,9 @@
 package pj.notice.service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,8 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import pj.notice.dto.NoticeEntityBulkRequest;
 import pj.notice.dto.NoticeEntityDto;
 import pj.notice.mapper.NoticeEntityMapper;
+import pj.notice.mapper.NotificationMapper;
 import pj.notice.model.NoticeEntityModel;
 import pj.notice.model.NoticeKeywordMapModel;
+import pj.notice.model.NotificationModel;
 
 @Service
 public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
@@ -19,46 +23,42 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 	@Autowired
 	private NoticeEntityMapper entityMapper;
 
+	@Autowired
+	private NotificationMapper notificationMapper;
+
 	@Override
 	@Transactional
 	public void saveBulk(NoticeEntityBulkRequest request) {
 
-		System.out.println("=== Service saveBulk 진입 ===");
+		System.out.println("=== [NER 분석 결과 저장 프로세스 시작] ===");
 
-		if (request.getEntities() == null) {
-			System.out.println("entities가 null입니다.");
+		// 1. 엔티티 리스트 자체가 비어있는 경우
+		if (request.getEntities() == null || request.getEntities().isEmpty()) {
+			System.out.println(">>> 추출된 키워드가 없습니다. 프로세스를 종료합니다.");
 			return;
 		}
 
-		System.out.println("entities size = " + request.getEntities().size());
-
 		List<NoticeEntityModel> entityLogList = new ArrayList<>();
+		int notificationCount = 0; // 생성된 알림 개수를 체크하기 위한 변수
+
+		// 중복 알림 방지를 위해 이미 알림을 보낸 키워드 ID를 저장할 Set 생성
+		Set<Long> processedKeywordIds = new HashSet<>();
 
 		for (NoticeEntityDto dto : request.getEntities()) {
 
-			System.out.println("--- 개별 엔티티 처리 시작 ---");
-			System.out.println("entity text = " + dto.getText());
-			System.out.println("entity type = " + dto.getType());
-			System.out.println("file name = " + dto.getFileName());
-
-			// [1] 키워드 정규화 (공백 제거, 소문자 변환)
+			// [1] 키워드 정규화
 			String rawText = dto.getText();
-			if (rawText == null || rawText.trim().isEmpty()) {
-				System.out.println("텍스트가 비어있어 스킵합니다.");
+			if (rawText == null || rawText.trim().isEmpty())
 				continue;
-			}
 
 			String normalized = rawText.replaceAll("\\s+", "").toLowerCase();
-			System.out.println("정규화된 텍스트: " + normalized);
 
-			// [2] 키워드 사전 처리 (tb_keyword)
-			System.out.println("DB 사전 체크 및 등록 중...");
-			entityMapper.insertKeyword(normalized); // 없으면 저장 (IGNORE)
+			// [2] 키워드 사전 관리
+			entityMapper.insertKeyword(normalized);
 			Long keywordId = entityMapper.selectKeywordIdByWord(normalized);
-			System.out.println("획득한 Keyword ID: " + keywordId);
 
 			if (keywordId != null) {
-				// [3] 공고-키워드 매핑 저장 (tb_notice_keyword_map)
+				// [3] 공고-키워드 매핑 정보 저장 (분석 근거이므로 중복되어도 모두 저장)
 				NoticeKeywordMapModel mapModel = new NoticeKeywordMapModel();
 				mapModel.setNotice_number(dto.getNoticeNumber());
 				mapModel.setKeyword_id(keywordId);
@@ -66,13 +66,33 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 				mapModel.setFile_name(dto.getFileName());
 
 				entityMapper.insertNoticeKeywordMap(mapModel);
-				System.out.println("공고-키워드 매핑 완료 (Notice: " + dto.getNoticeNumber() + ")");
+
+				// [4] 사용자 맞춤형 알림 생성 (중복 체크 로직 추가)
+				if (!processedKeywordIds.contains(keywordId)) {
+					List<Long> memberIds = entityMapper.selectMembersByKeywordId(keywordId);
+
+					for (Long memberId : memberIds) {
+						NotificationModel alert = new NotificationModel();
+						alert.setMember_id(memberId);
+						alert.setNotice_number(dto.getNoticeNumber());
+						alert.setMessage("[" + normalized + "] 관련 키워드가 포함된 신규 공고가 등록되었습니다.");
+
+						notificationMapper.insertNotification(alert);
+						notificationCount++; // 알림 생성 시 카운트 증가
+						System.out.println("   -> 알림 생성: 회원ID(" + memberId + "), 키워드(" + normalized + ")");
+					}
+
+					// 해당 키워드는 이 공고에서 알림 처리가 끝났음을 기록
+					processedKeywordIds.add(keywordId);
+				} else {
+					System.out.println("   -> [중복 방지] 키워드(" + normalized + ")는 이미 이 공고에서 알림이 생성되었습니다.");
+				}
 			}
 
-			// [4] 기존 상세 정보 모델 생성 (tb_notice_entity 로그용)
+			// [5] 상세 분석 결과 리스트 구성
 			NoticeEntityModel entity = new NoticeEntityModel();
 			entity.setNotice_number(dto.getNoticeNumber());
-			entity.setEntity_value(rawText); // 원본 유지
+			entity.setEntity_value(rawText);
 			entity.setEntity_type(dto.getType());
 			entity.setFile_name(dto.getFileName());
 			entity.setFile_url(dto.getFileUrl());
@@ -80,25 +100,27 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 			entityLogList.add(entity);
 		}
 
-		// [5] 상세 정보 벌크 인서트
+		// [6] 상세 분석 결과 벌크 인서트
 		if (!entityLogList.isEmpty()) {
-			System.out.println("DB insert 시작 (tb_notice_entity), count = " + entityLogList.size());
 			entityMapper.insertEntities(entityLogList);
-			System.out.println("DB insert 완료");
+			System.out.println(">>> 총 " + entityLogList.size() + "개의 키워드 데이터가 저장되었습니다.");
 		}
 
-		System.out.println("=== Service saveBulk 처리 종료 ===");
+		// 최종 로그: 알림 생성 여부에 따라 메시지 차별화
+		if (notificationCount > 0) {
+			System.out.println("=== [프로세스 완료: 총 " + notificationCount + "건의 맞춤 알림 발송 완료] ===");
+		} else {
+			System.out.println("=== [프로세스 완료: 매칭되는 관심 키워드 회원이 없어 알림을 생성하지 않았습니다] ===");
+		}
 	}
 
 	@Override
 	public List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber) {
-		System.out.println("공고번호 조회: " + noticeNumber);
 		return entityMapper.selectByNoticeNumber(noticeNumber);
 	}
 
 	@Override
 	public List<NoticeEntityModel> searchByKeyword(String keyword) {
-		System.out.println("키워드 검색: " + keyword);
 		return entityMapper.searchByKeyword(keyword);
 	}
 }
