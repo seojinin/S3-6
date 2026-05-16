@@ -35,25 +35,17 @@ const DB = {
             if (u) { if (!u.keywordChecks) u.keywordChecks = {}; u.keywordChecks[keyword] = checked; this.save(); }
         }
     },
-	// DB 객체 내의 addNotification 수정
-	addNotification(message, keyword, notice_number, notice_title) { // notice_title 추가
-	    if (this.currentUser) {
-	        const u = this.users.find(u => u.id === this.currentUser.id);
-	        if (u) {
-	            const now = new Date();
-	            const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-	            
-	            u.notifications.push({ 
-	                message, 
-	                keyword, 
-	                date: d, 
-	                notice_number: notice_number,
-	                notice_title: notice_title // 공고명 저장
-	            });
-	            this.save();
-	        }
-	    }
-	},
+    addNotification(message, keyword, notice_number, notice_title) {
+        if (this.currentUser) {
+            const u = this.users.find(u => u.id === this.currentUser.id);
+            if (u) {
+                const now = new Date();
+                const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                u.notifications.push({ message, keyword, date: d, notice_number, notice_title });
+                this.save();
+            }
+        }
+    },
     getNotifications() {
         if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? u.notifications : []; }
         return [];
@@ -63,18 +55,14 @@ const DB = {
 // 알림 클릭 시 호출될 함수
 function goToNoticeDetail(notice_number) {
     if (!notice_number) return;
-
-    // 1. 알림 드롭다운 닫기
     const d = document.getElementById('notificationDropdown');
     if (d) d.classList.remove('show');
-
-    // 2. 상세 페이지 섹션 표시 및 데이터 로드
     showBidDetail(notice_number);
 }
 
 // ===== 상태 변수 =====
-let allData    = [];   // 서버에서 받은 전체 데이터
-let apiData    = [];   // 검색 필터 적용 후 표시할 데이터
+let allData    = [];
+let apiData    = [];
 let totalCount = 0;
 let currentPage = 1;
 const itemsPerPage = 10;
@@ -105,32 +93,19 @@ function restoreBidState() {
 
 // ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
-    // [추가] 처음 실행 시 기존 로컬스토리지의 알림 기록을 삭제
-    clearAllNotificationsOnStart(); 
-
+    clearAllNotificationsOnStart();
     history.replaceState({ page: 'main' }, '', '#main');
     fetchBidList();
 });
 
-// [추가] 알림 삭제 전용 함수
 function clearAllNotificationsOnStart() {
-    // 1. 로컬스토리지에 저장된 모든 유저의 알림 배열을 비웁니다.
-    DB.users.forEach(user => {
-        user.notifications = [];
-    });
-    
-    // 2. 현재 로그인된 상태라면 해당 객체의 알림도 비웁니다.
+    DB.users.forEach(user => { user.notifications = []; });
     if (DB.currentUser) {
         const u = DB.users.find(u => u.id === DB.currentUser.id);
         if (u) u.notifications = [];
     }
-
-    // 3. 변경사항 저장
     DB.save();
-    
-    // 4. (선택사항) 화면 배지나 리스트도 즉시 0으로 갱신
     updateNotificationBadge();
-    console.log("초기 실행: 이전 알림 기록이 삭제되었습니다.");
 }
 
 // ===== 목록 호출 =====
@@ -155,20 +130,14 @@ async function fetchBidList(page = 1) {
     }
 }
 
-// !!수정!!
 // ===== 검색 필터 적용 =====
 function applySearchFilter() {
     const searchTerm = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
-    
     apiData = searchTerm ? allData.filter(item => {
-        const title = (item.notice_title || '').toLowerCase();
-        // 백엔드에서 GROUP_CONCAT으로 합쳐서 보내주는 키워드 필드
-        const keywords = (item.entity_value || '').toLowerCase(); 
-        
-        // 제목이나 키워드 중 하나라도 검색어를 포함하면 true
+        const title    = (item.notice_title || '').toLowerCase();
+        const keywords = (item.entity_value || '').toLowerCase();
         return title.includes(searchTerm) || keywords.includes(searchTerm);
     }) : allData;
-    
     totalCount = apiData.length;
 }
 
@@ -189,8 +158,6 @@ function formatDate(val) {
     return val;
 }
 
-
-// !!수정!!
 // ===== 테이블 렌더링 =====
 function renderBidTable() {
     const table = document.getElementById('bidTable');
@@ -211,13 +178,8 @@ function renderBidTable() {
         const item = apiData[i];
         const row  = table.insertRow();
         row.style.cursor = 'pointer';
-        
-        // 행 전체 클릭 시 상세 페이지로 이동 (단, 파일 링크 클릭 시에는 방해 안 되게 처리 필요)
-        row.onclick = (e) => { 
-            if(e.target.tagName !== 'A') { // 클릭한 게 링크(A태그)가 아닐 때만 상세페이지로
-                saveBidState(); 
-                showBidDetail(item.notice_number); 
-            }
+        row.onclick = (e) => {
+            if (e.target.tagName !== 'A') { saveBidState(); showBidDetail(item.notice_number); }
         };
 
         row.insertCell(0).textContent = i + 1;
@@ -235,25 +197,19 @@ function renderBidTable() {
         row.insertCell(4).textContent = item.region           || '-';
         row.insertCell(5).textContent = item.agency           || '-';
 
-        // --- 수정된 부분: 첨부파일 칸 (6번 인덱스) ---
         const fileCell = row.insertCell(6);
-        
-        // 데이터에 파일 정보가 있는지 확인 (백엔드에서 '| ' 구분자로 합쳐서 보낸다고 가정)
         if (item.file_name && item.file_url) {
             const names = item.file_name.split('| ');
-            const urls = item.file_url.split('| ');
-            
-            let fileLinksHtml = '';
+            const urls  = item.file_url.split('| ');
+            let html = '';
             names.forEach((name, idx) => {
                 const url = urls[idx] || '#';
-                // 파일 아이콘과 함께 짧게 표시 (여러 개일 경우 첫 번째 파일 위주로 표시하거나 아이콘화 가능)
-                fileLinksHtml += `<a href="${url}" target="_blank" title="${name}" style="color:#2563eb; text-decoration:none; margin-right:5px;">💾</a>`;
+                html += `<a href="${url}" target="_blank" title="${name}" style="color:#2563eb;text-decoration:none;margin-right:5px;">💾</a>`;
             });
-            fileCell.innerHTML = fileLinksHtml;
+            fileCell.innerHTML = html;
         } else {
             fileCell.textContent = '-';
         }
-        // ------------------------------------------
     }
 }
 
@@ -274,17 +230,13 @@ function renderMainBidTable() {
     });
 }
 
-// !!수정!!
 // ===== 상세 페이지 =====
 async function showBidDetail(notice_number) {
     showPage('bidDetail');
-
     try {
-        // 1. 네가 만든 백엔드 상세 API 호출!
-        const res = await fetch(`http://localhost:8080/api/notices/${notice_number}/detail`);
+        const res  = await fetch(`http://localhost:8080/api/notices/${notice_number}/detail`);
         const data = await res.json();
 
-        // 2. 기본 정보 렌더링
         document.getElementById('detailTitle').textContent      = data.notice_title    || '-';
         document.getElementById('detailNtceNo').textContent     = data.notice_number   || '-';
         document.getElementById('detailMethod').textContent     = data.contract_method || '-';
@@ -296,26 +248,16 @@ async function showBidDetail(notice_number) {
         document.getElementById('detailBizType').textContent    = data.biz_type        || '-';
         document.getElementById('detailRegion').textContent     = data.region          || '-';
 
-        // 3. 첨부파일 렌더링 (핵심!)
         const fileContainer = document.getElementById('detailFiles');
-        fileContainer.innerHTML = ''; // 기존 하드코딩 텍스트 초기화
-
+        fileContainer.innerHTML = '';
         if (data.files && data.files.length > 0) {
             data.files.forEach(file => {
-                const fileLink = document.createElement('a');
-                fileLink.href = file.fileUrl;
-                fileLink.textContent = `💾 ${file.fileName}`;
-                fileLink.target = '_blank'; // 클릭 시 새 창에서 파일 열기/다운로드
-                fileLink.style.display = 'block'; // 파일이 여러 개일 경우 세로로 나열
-                fileLink.style.marginBottom = '5px';
-                fileLink.style.color = '#2563eb';
-                fileLink.style.textDecoration = 'none';
-                
-                fileContainer.appendChild(fileLink);
+                const a = document.createElement('a');
+                a.href = file.fileUrl; a.textContent = `💾 ${file.fileName}`;
+                a.target = '_blank'; a.style.cssText = 'display:block;margin-bottom:5px;color:#2563eb;text-decoration:none;';
+                fileContainer.appendChild(a);
             });
-        } else {
-            fileContainer.textContent = '첨부파일 없음';
-        }
+        } else { fileContainer.textContent = '첨부파일 없음'; }
     } catch (e) {
         console.error('상세 정보 로드 실패:', e);
         document.getElementById('detailFiles').textContent = '상세 정보를 불러올 수 없습니다.';
@@ -365,6 +307,16 @@ function clearFilters() {
     applySearchFilter(); currentPage = 1; renderBidTable(); renderPagination();
 }
 
+// ===== 메인페이지 키워드 클릭 → 입찰공고 검색 =====
+function searchByKeyword(keyword) {
+    document.getElementById('searchInput').value = keyword;
+    showPage('bid');
+    applySearchFilter();
+    currentPage = 1;
+    renderBidTable();
+    renderPagination();
+}
+
 // ===== 페이지 전환 =====
 function showPage(id, pushHistory = true) {
     document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
@@ -372,12 +324,9 @@ function showPage(id, pushHistory = true) {
     if (id !== 'mypage') resetKeywordEditMode();
     if (id === 'mypage') { resetKeywordEditMode(); loadMyPage(); }
     if (id === 'bid')    { if (!restoreBidState()) updateBidStats(); }
-
-    // 브라우저 히스토리에 현재 페이지 등록
     if (pushHistory) history.pushState({ page: id }, '', '#' + id);
 }
 
-// 브라우저 뒤로가기/앞으로가기 감지
 window.addEventListener('popstate', (e) => {
     const id = e.state?.page || 'main';
     showPage(id, false);
@@ -397,27 +346,22 @@ function showTableError(tableId, cols, msg) {
     cell.colSpan = cols; cell.style.cssText = 'text-align:center;padding:40px;color:#ef4444;'; cell.textContent = msg;
 }
 
-// !!수정!!
 // ===== 키워드 알림 체크 =====
 function checkNewBidsForKeywords() {
     if (!DB.currentUser) return;
-    const kws = DB.getUserKeywords();
+    const kws   = DB.getUserKeywords();
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
-
-	// checkNewBidsForKeywords 함수 내 수정
-	allData.forEach(item => {
-	    if (String(item.bid_start || '').startsWith(today)) {
-	        kws.forEach(kw => {
-	            const titleMatch = (item.notice_title || '').includes(kw);
-	            const keywordMatch = (item.entity_value || '').includes(kw);
-	            
-	            if (titleMatch || keywordMatch) {
-	                // 네 번째 인자로 item.notice_title을 넘겨줍니다.
-	                DB.addNotification(`새 입찰공고`, kw, item.notice_number, item.notice_title);
-	            }
-	        });
-	    }
-	});
+    allData.forEach(item => {
+        if (String(item.bid_start || '').startsWith(today)) {
+            kws.forEach(kw => {
+                const titleMatch   = (item.notice_title || '').includes(kw);
+                const keywordMatch = (item.entity_value || '').includes(kw);
+                if (titleMatch || keywordMatch) {
+                    DB.addNotification('새 입찰공고', kw, item.notice_number, item.notice_title);
+                }
+            });
+        }
+    });
     updateNotificationBadge();
 }
 
@@ -472,7 +416,8 @@ function loadUserKeywords() {
     const kws=DB.getUserKeywords();
     document.getElementById('keywordList').innerHTML = kws.length===0
         ? '<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'
-        : kws.map(kw=>`<div class="keyword-item" onclick="showPage('mypage')"><span class="keyword-item-text">${kw}</span></div>`).join('');
+        // ★ 클릭 시 입찰공고 검색으로 이동
+        : kws.map(kw=>`<div class="keyword-item" onclick="searchByKeyword('${kw}')"><span class="keyword-item-text">${kw}</span></div>`).join('');
     loadMypageKeywordList();
 }
 function loadMyPage() {
@@ -543,21 +488,172 @@ function resetKeywordEditMode() {
     if(eb){eb.textContent='수정';eb.className='btn-edit';} if(bd)bd.style.display='none'; if(ab)ab.classList.remove('show');
 }
 function showKeywordInputBox() { document.getElementById('mypageKeywordInput').focus(); }
+
+// ===== 키워드 팝업 =====
+let popupKeyword = '';
+
+function openKeywordPopup(val) {
+    if (!val || val.trim() === '') return;
+    popupKeyword = val.trim();
+    document.getElementById('keywordPopupInput').value = popupKeyword;
+    renderPopupTag(popupKeyword);
+    document.getElementById('keywordPopup').classList.add('show');
+    document.getElementById('keywordPopupInput').focus();
+}
+
+function closeKeywordPopup() {
+    document.getElementById('keywordPopup').classList.remove('show');
+    document.getElementById('mypageKeywordInput').value = '';
+    popupKeyword = '';
+    renderPopupTag('');
+}
+
+function syncKeywordInput(val) {
+    popupKeyword = val.trim();
+    renderPopupTag(popupKeyword);
+}
+
+function renderPopupTag(kw) {
+    const wrap = document.getElementById('keywordPopupTag');
+    if (!kw) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `<span class="keyword-popup-tag">${kw}<button onclick="clearPopupTag()">×</button></span>`;
+}
+
+function clearPopupTag() {
+    popupKeyword = '';
+    document.getElementById('keywordPopupInput').value = '';
+    document.getElementById('keywordPopupTag').innerHTML = '';
+}
+
+function handlePopupEnter(e) { if (e.key === 'Enter') confirmKeywordPopup(); }
+
+function confirmKeywordPopup() {
+    const kw = popupKeyword || document.getElementById('keywordPopupInput').value.trim();
+    if (!kw) return;
+    const cur = DB.getUserKeywords();
+    if (cur.includes(kw)) { showAlert('이미 존재하는 키워드입니다.'); return; }
+    cur.push(kw);
+    DB.updateUserKeywords(cur);
+    loadUserKeywords();
+    updateBidStats();
+    closeKeywordPopup();
+    showAlert(`'${kw}' 키워드가 등록되었습니다.`);
+}
+
+document.addEventListener('click', e => {
+    const popup = document.getElementById('keywordPopup');
+    const inner = document.querySelector('.keyword-popup-inner');
+    if (popup && popup.classList.contains('show') && inner && !inner.contains(e.target)) {
+        closeKeywordPopup();
+    }
+});
+
 function deleteKeyword(kw) {
     if (confirm('삭제하시겠습니까?')) { DB.updateUserKeywords(DB.getUserKeywords().filter(k=>k!==kw)); loadUserKeywords(); updateBidStats(); }
 }
+
+// ===== 알림 (마이페이지) =====
 function loadNotifications() {
-    const notis=DB.getNotifications(), container=document.getElementById('notificationList');
-    if (notis.length===0) { container.innerHTML='<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>'; return; }
-    container.innerHTML=notis.map((n,i)=>`
-        <div class="notification-item">새로운 입찰공고가 올라왔습니다. - <strong>${n.keyword}</strong>
-            <span class="date">${n.date}</span>
-            <button class="delete-noti" onclick="deleteNotification(${i})" title="삭제">×</button>
-        </div>`).join('');
+    fetchNotificationsFromDB();
 }
+
+function loadNotificationDropdown() {
+    fetchNotificationsFromDB();
+}
+
+async function fetchNotificationsFromDB() {
+    const memberId = 1;
+    try {
+        const res = await fetch(`http://localhost:8080/api/notifications/${memberId}`);
+        if (res.ok) {
+            const notis = await res.json();
+            renderNotifications(notis);
+        }
+    } catch(e) {
+        // 백엔드 알림 API 없으면 localStorage 알림으로 폴백
+        renderLocalNotifications();
+    }
+}
+
+function renderLocalNotifications() {
+    const notis = DB.getNotifications();
+    const badge = document.getElementById('notificationBadge');
+    if (badge) { badge.textContent = notis.length; badge.style.display = notis.length === 0 ? 'none' : 'flex'; }
+
+    const dropdownContent = document.getElementById('notificationDropdownContent');
+    if (dropdownContent) {
+        if (notis.length === 0) { dropdownContent.innerHTML = '<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>'; return; }
+        dropdownContent.innerHTML = notis.slice(0,5).map((n,i) => `
+            <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;">
+                <strong style="color:#2563eb;">[${n.keyword}]</strong> ${n.notice_title || '새로운 공고'}<br>
+                <span style="font-size:11px;color:#9ca3af;">${n.date}</span>
+            </div>`).join('');
+    }
+
+    const mypageList = document.getElementById('notificationList');
+    if (mypageList) {
+        if (notis.length === 0) { mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>'; return; }
+        mypageList.innerHTML = notis.map((n,i) => `
+            <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding-left:15px;">
+                <div>
+                    <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword}</span>
+                    <strong>${n.notice_title || '공고 정보 없음'}</strong>
+                </div>
+                <span class="date" style="font-size:12px;color:#6b7280;">${n.date}</span>
+                <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${i})" title="삭제">×</button>
+            </div>`).join('');
+    }
+}
+
+function renderNotifications(notis) {
+    const unreadCount = notis.filter(n => !n.is_read).length;
+    const badge = document.getElementById('notificationBadge');
+    if (badge) { badge.textContent = unreadCount; badge.style.display = unreadCount === 0 ? 'none' : 'flex'; }
+
+    const dropdownContent = document.getElementById('notificationDropdownContent');
+    if (dropdownContent) {
+        dropdownContent.innerHTML = notis.slice(0,5).map(n => `
+            <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;">
+                <strong style="color:#2563eb;">[${n.keyword || '알림'}]</strong> ${n.notice_title || '새로운 공고가 등록되었습니다.'}<br>
+                <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}</span>
+            </div>`).join('');
+    }
+
+    const mypageList = document.getElementById('notificationList');
+    if (mypageList) {
+        mypageList.innerHTML = notis.map(n => `
+            <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding-left:15px;">
+                <div>
+                    <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
+                    <strong>${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                </div>
+                <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
+                <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="삭제">×</button>
+            </div>`).join('');
+    }
+}
+
 function deleteNotification(index) {
-    if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.notifications.splice(index,1); DB.save(); loadNotifications(); } }
+    if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.notifications.splice(index,1); DB.save(); renderLocalNotifications(); } }
 }
+
+function updateNotificationBadge() {
+    const n=DB.getNotifications(), badge=document.getElementById('notificationBadge');
+    if (badge) { badge.textContent=n.length; badge.style.display=n.length===0?'none':'flex'; }
+}
+
+function toggleNotificationDropdown() {
+    const d=document.getElementById('notificationDropdown'); d.classList.toggle('show');
+    if (d.classList.contains('show')) fetchNotificationsFromDB();
+}
+
+document.addEventListener('click', e => {
+    const d=document.getElementById('notificationDropdown'), bell=document.getElementById('notificationBell');
+    if (d && bell && !bell.contains(e.target)&&!d.contains(e.target)) d.classList.remove('show');
+});
+
+setInterval(fetchNotificationsFromDB, 10000);
+
 function addMypageKeyword() {
     const input=document.getElementById('mypageKeywordInput'), val=input.value.trim();
     if (!val) return;
@@ -584,111 +680,7 @@ function showConfirm(msg)  { document.getElementById('confirmMessage').textConte
 function closeConfirm()    { document.getElementById('confirmModal').classList.remove('show'); }
 function confirmAction()   { if (bulkDeleteCallback) { const cb=bulkDeleteCallback; bulkDeleteCallback=null; closeConfirm(); closeBulkDeleteModal(); cb(); } else closeConfirm(); }
 
-// ===== 알림 =====
-function updateNotificationBadge() {
-    const n=DB.getNotifications(), badge=document.getElementById('notificationBadge');
-    badge.textContent=n.length; badge.style.display=n.length===0?'none':'flex';
-}
-function toggleNotificationDropdown() {
-    const d=document.getElementById('notificationDropdown'); d.classList.toggle('show');
-    if (d.classList.contains('show')) loadNotificationDropdown();
-}
-function loadNotificationDropdown() {
-    const notis=DB.getNotifications(), c=document.getElementById('notificationDropdownContent');
-    if (notis.length===0) { c.innerHTML='<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>'; return; }
-    c.innerHTML=notis.slice(0,5).map(n=>`<div class="notification-dropdown-item"><strong>${n.keyword}</strong> 키워드와 매칭되는 새 공고<br><span style="font-size:11px;color:#9ca3af;">${n.date}</span></div>`).join('');
-}
-document.addEventListener('click', e => {
-    const d=document.getElementById('notificationDropdown'), bell=document.getElementById('notificationBell');
-    if (!bell.contains(e.target)&&!d.contains(e.target)) d.classList.remove('show');
-});
-
 // ===== Alert =====
 function showAlert(msg) { document.getElementById('alertMessage').textContent=msg; document.getElementById('alertModal').classList.add('show'); setTimeout(()=>document.getElementById('alertModal').focus(),100); }
 function closeAlert()   { document.getElementById('alertModal').classList.remove('show'); }
 document.addEventListener('keypress', e => { if (e.key==='Enter'&&document.getElementById('alertModal').classList.contains('show')) closeAlert(); });
-
-// ===== 알림 (백엔드 API 연동) =====
-
-// 1. 서버에서 내 알림 가져오기
-async function fetchNotificationsFromDB() {
-    // ⚠️ 아직 백엔드 로그인이 없으므로, DB에 있는 임시 테스트 회원 ID (예: 1)를 하드코딩해서 테스트합니다.
-    const memberId = 1; 
-
-    try {
-        const res = await fetch(`http://localhost:8080/api/notifications/${memberId}`);
-        if(res.ok) {
-            const notis = await res.json();
-            renderNotifications(notis);
-        }
-    } catch(e) {
-        console.error('알림 로드 실패:', e);
-    }
-}
-
-// 2. 가져온 알림을 화면(배지, 드롭다운, 마이페이지)에 그리기
-function renderNotifications(notis) {
-    const unreadCount = notis.filter(n => !n.is_read).length;
-    const badge = document.getElementById('notificationBadge');
-    if (badge) {
-        badge.textContent = unreadCount;
-        badge.style.display = unreadCount === 0 ? 'none' : 'flex';
-    }
-
-    // 헤더 드롭다운
-	const dropdownContent = document.getElementById('notificationDropdownContent');
-    if (dropdownContent) {
-        dropdownContent.innerHTML = notis.slice(0, 5).map(n => {
-            // 메시지 "[키워드] ..." 에서 키워드만 추출하는 정규식 (백엔드 필드가 없을 경우 대비)
-            const matchedKw = n.keyword || (n.message.match(/\[(.*?)\]/) ? n.message.match(/\[(.*?)\]/)[1] : '알림');
-            
-            return `
-                <div class="notification-dropdown-item" 
-                     onclick="goToNoticeDetail('${n.notice_number}')" 
-                     style="cursor:pointer;">
-                    <strong style="color:#2563eb;">[${matchedKw}]</strong> 
-                    ${n.notice_title || '새로운 공고가 등록되었습니다.'}<br>
-                    <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}</span>
-                </div>`;
-        }).join('');
-    }
-
-    // 마이페이지 알림 리스트
-	const mypageList = document.getElementById('notificationList');
-    if (mypageList) {
-        mypageList.innerHTML = notis.map((n, i) => {
-            const matchedKw = n.keyword || (n.message.match(/\[(.*?)\]/) ? n.message.match(/\[(.*?)\]/)[1] : '키워드');
-            
-            return `
-                <div class="notification-item" 
-                     onclick="goToNoticeDetail('${n.notice_number}')" 
-                     style="cursor:pointer; margin-bottom:10px; border-left:4px solid #2563eb; padding-left:15px;">
-                    <div>
-                        <span class="kw-tag" style="background:#e0e7ff; color:#4338ca; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:bold; margin-right:8px;">
-                            ${matchedKw}
-                        </span>
-                        <strong>${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
-                    </div>
-                    <span class="date" style="font-size:12px; color:#6b7280;">${n.created_at || '-'}</span>
-                    <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="삭제">×</button>
-                </div>`;
-        }).join('');
-    }
-}
-
-// 3. 종 모양 아이콘 클릭 시 드롭다운 열면서 최신 알림 다시 불러오기
-function toggleNotificationDropdown() {
-    const d = document.getElementById('notificationDropdown');
-    d.classList.toggle('show');
-    if (d.classList.contains('show')) {
-        fetchNotificationsFromDB();
-    }
-}
-
-// 4. 로그인 직후나 마이페이지 로드 시 알림 불러오기 적용
-function loadNotifications() {
-    fetchNotificationsFromDB();
-}
-
-// 주기적으로 새 알림이 있는지 체크 (10초마다)
-setInterval(fetchNotificationsFromDB, 10000);
