@@ -11,5 +11,8 @@ public class NotificationModel {
 	private String message;
 	private boolean is_read;
 	private String created_at;
+	
+	private String keyword;
+    private String notice_title;
 
 }

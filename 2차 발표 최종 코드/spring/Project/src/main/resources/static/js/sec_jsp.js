@@ -35,22 +35,42 @@ const DB = {
             if (u) { if (!u.keywordChecks) u.keywordChecks = {}; u.keywordChecks[keyword] = checked; this.save(); }
         }
     },
-    addNotification(message, keyword) {
-        if (this.currentUser) {
-            const u = this.users.find(u => u.id === this.currentUser.id);
-            if (u) {
-                const now = new Date();
-                const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                u.notifications.push({ message, keyword, date: d });
-                this.save();
-            }
-        }
-    },
+	// DB 객체 내의 addNotification 수정
+	addNotification(message, keyword, notice_number, notice_title) { // notice_title 추가
+	    if (this.currentUser) {
+	        const u = this.users.find(u => u.id === this.currentUser.id);
+	        if (u) {
+	            const now = new Date();
+	            const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+	            
+	            u.notifications.push({ 
+	                message, 
+	                keyword, 
+	                date: d, 
+	                notice_number: notice_number,
+	                notice_title: notice_title // 공고명 저장
+	            });
+	            this.save();
+	        }
+	    }
+	},
     getNotifications() {
         if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? u.notifications : []; }
         return [];
     }
 };
+
+// 알림 클릭 시 호출될 함수
+function goToNoticeDetail(notice_number) {
+    if (!notice_number) return;
+
+    // 1. 알림 드롭다운 닫기
+    const d = document.getElementById('notificationDropdown');
+    if (d) d.classList.remove('show');
+
+    // 2. 상세 페이지 섹션 표시 및 데이터 로드
+    showBidDetail(notice_number);
+}
 
 // ===== 상태 변수 =====
 let allData    = [];   // 서버에서 받은 전체 데이터
@@ -85,9 +105,33 @@ function restoreBidState() {
 
 // ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
+    // [추가] 처음 실행 시 기존 로컬스토리지의 알림 기록을 삭제
+    clearAllNotificationsOnStart(); 
+
     history.replaceState({ page: 'main' }, '', '#main');
     fetchBidList();
 });
+
+// [추가] 알림 삭제 전용 함수
+function clearAllNotificationsOnStart() {
+    // 1. 로컬스토리지에 저장된 모든 유저의 알림 배열을 비웁니다.
+    DB.users.forEach(user => {
+        user.notifications = [];
+    });
+    
+    // 2. 현재 로그인된 상태라면 해당 객체의 알림도 비웁니다.
+    if (DB.currentUser) {
+        const u = DB.users.find(u => u.id === DB.currentUser.id);
+        if (u) u.notifications = [];
+    }
+
+    // 3. 변경사항 저장
+    DB.save();
+    
+    // 4. (선택사항) 화면 배지나 리스트도 즉시 0으로 갱신
+    updateNotificationBadge();
+    console.log("초기 실행: 이전 알림 기록이 삭제되었습니다.");
+}
 
 // ===== 목록 호출 =====
 async function fetchBidList(page = 1) {
@@ -232,12 +276,12 @@ function renderMainBidTable() {
 
 // !!수정!!
 // ===== 상세 페이지 =====
-async function showBidDetail(noticeNumber) {
+async function showBidDetail(notice_number) {
     showPage('bidDetail');
 
     try {
         // 1. 네가 만든 백엔드 상세 API 호출!
-        const res = await fetch(`http://localhost:8080/api/notices/${noticeNumber}/detail`);
+        const res = await fetch(`http://localhost:8080/api/notices/${notice_number}/detail`);
         const data = await res.json();
 
         // 2. 기본 정보 렌더링
@@ -360,20 +404,20 @@ function checkNewBidsForKeywords() {
     const kws = DB.getUserKeywords();
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
 
-    allData.forEach(item => {
-        // 오늘 올라온 공고인 경우
-        if (String(item.bid_start || '').startsWith(today)) {
-            kws.forEach(kw => {
-                const titleMatch = (item.notice_title || '').includes(kw);
-                const keywordMatch = (item.entity_value || '').includes(kw);
-                
-                // 제목 또는 AI 키워드 리스트에 내 관심 키워드가 있다면 알림 추가
-                if (titleMatch || keywordMatch) {
-                    DB.addNotification(`새 입찰공고(매칭): ${item.notice_title}`, kw);
-                }
-            });
-        }
-    });
+	// checkNewBidsForKeywords 함수 내 수정
+	allData.forEach(item => {
+	    if (String(item.bid_start || '').startsWith(today)) {
+	        kws.forEach(kw => {
+	            const titleMatch = (item.notice_title || '').includes(kw);
+	            const keywordMatch = (item.entity_value || '').includes(kw);
+	            
+	            if (titleMatch || keywordMatch) {
+	                // 네 번째 인자로 item.notice_title을 넘겨줍니다.
+	                DB.addNotification(`새 입찰공고`, kw, item.notice_number, item.notice_title);
+	            }
+	        });
+	    }
+	});
     updateNotificationBadge();
 }
 
@@ -563,3 +607,88 @@ document.addEventListener('click', e => {
 function showAlert(msg) { document.getElementById('alertMessage').textContent=msg; document.getElementById('alertModal').classList.add('show'); setTimeout(()=>document.getElementById('alertModal').focus(),100); }
 function closeAlert()   { document.getElementById('alertModal').classList.remove('show'); }
 document.addEventListener('keypress', e => { if (e.key==='Enter'&&document.getElementById('alertModal').classList.contains('show')) closeAlert(); });
+
+// ===== 알림 (백엔드 API 연동) =====
+
+// 1. 서버에서 내 알림 가져오기
+async function fetchNotificationsFromDB() {
+    // ⚠️ 아직 백엔드 로그인이 없으므로, DB에 있는 임시 테스트 회원 ID (예: 1)를 하드코딩해서 테스트합니다.
+    const memberId = 1; 
+
+    try {
+        const res = await fetch(`http://localhost:8080/api/notifications/${memberId}`);
+        if(res.ok) {
+            const notis = await res.json();
+            renderNotifications(notis);
+        }
+    } catch(e) {
+        console.error('알림 로드 실패:', e);
+    }
+}
+
+// 2. 가져온 알림을 화면(배지, 드롭다운, 마이페이지)에 그리기
+function renderNotifications(notis) {
+    const unreadCount = notis.filter(n => !n.is_read).length;
+    const badge = document.getElementById('notificationBadge');
+    if (badge) {
+        badge.textContent = unreadCount;
+        badge.style.display = unreadCount === 0 ? 'none' : 'flex';
+    }
+
+    // 헤더 드롭다운
+	const dropdownContent = document.getElementById('notificationDropdownContent');
+    if (dropdownContent) {
+        dropdownContent.innerHTML = notis.slice(0, 5).map(n => {
+            // 메시지 "[키워드] ..." 에서 키워드만 추출하는 정규식 (백엔드 필드가 없을 경우 대비)
+            const matchedKw = n.keyword || (n.message.match(/\[(.*?)\]/) ? n.message.match(/\[(.*?)\]/)[1] : '알림');
+            
+            return `
+                <div class="notification-dropdown-item" 
+                     onclick="goToNoticeDetail('${n.notice_number}')" 
+                     style="cursor:pointer;">
+                    <strong style="color:#2563eb;">[${matchedKw}]</strong> 
+                    ${n.notice_title || '새로운 공고가 등록되었습니다.'}<br>
+                    <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}</span>
+                </div>`;
+        }).join('');
+    }
+
+    // 마이페이지 알림 리스트
+	const mypageList = document.getElementById('notificationList');
+    if (mypageList) {
+        mypageList.innerHTML = notis.map((n, i) => {
+            const matchedKw = n.keyword || (n.message.match(/\[(.*?)\]/) ? n.message.match(/\[(.*?)\]/)[1] : '키워드');
+            
+            return `
+                <div class="notification-item" 
+                     onclick="goToNoticeDetail('${n.notice_number}')" 
+                     style="cursor:pointer; margin-bottom:10px; border-left:4px solid #2563eb; padding-left:15px;">
+                    <div>
+                        <span class="kw-tag" style="background:#e0e7ff; color:#4338ca; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:bold; margin-right:8px;">
+                            ${matchedKw}
+                        </span>
+                        <strong>${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                    </div>
+                    <span class="date" style="font-size:12px; color:#6b7280;">${n.created_at || '-'}</span>
+                    <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="삭제">×</button>
+                </div>`;
+        }).join('');
+    }
+}
+
+// 3. 종 모양 아이콘 클릭 시 드롭다운 열면서 최신 알림 다시 불러오기
+function toggleNotificationDropdown() {
+    const d = document.getElementById('notificationDropdown');
+    d.classList.toggle('show');
+    if (d.classList.contains('show')) {
+        fetchNotificationsFromDB();
+    }
+}
+
+// 4. 로그인 직후나 마이페이지 로드 시 알림 불러오기 적용
+function loadNotifications() {
+    fetchNotificationsFromDB();
+}
+
+// 주기적으로 새 알림이 있는지 체크 (10초마다)
+setInterval(fetchNotificationsFromDB, 10000);
