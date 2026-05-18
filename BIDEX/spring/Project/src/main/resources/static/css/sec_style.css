@@ -22,7 +22,7 @@ header {
     max-width: 1280px;
     margin: auto;
     padding: 0 24px;
-    height: 80px;        /* 헤더 높이 고정 */
+    height: 130px;        /* 헤더 높이 고정 */
     display: flex;
     justify-content: space-between;
     align-items: center;
