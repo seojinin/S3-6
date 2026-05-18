@@ -5,6 +5,9 @@ import pdfplumber
 import requests
 import tempfile
 import zipfile
+import time                 # 추가
+import concurrent.futures   # 추가
+import multiprocessing      # 추가
 
 from tika import parser
 from lxml import etree
@@ -16,6 +19,7 @@ from lxml import etree
 
 KEEP_TITLE_KEYWORDS = ["자재", "재료", "제품", "기구", "기기", "부속품"]
 KEYWORD_MATCH_MODE = "OR"
+PARSE_TIMEOUT_SECONDS = 60  # 추가
 
 
 ########################################
@@ -171,6 +175,44 @@ def split_sentences(lines):
             num += 1
 
     return sentences
+
+
+# 함수 추가
+########################################
+# ===== 시간 측정 (타임아웃) =====
+########################################
+
+def _worker(fn, args, queue):
+    try:
+        result = fn(*args)
+        queue.put(("ok", result))
+    except Exception as e:
+        queue.put(("error", str(e)))
+
+def run_parse_time(fn, *args, timeout=PARSE_TIMEOUT_SECONDS):
+    '''
+    파싱 함수를 별도 스레드에서 실행하고 timeout 초 초과 시 TimeoutError 발생
+    반환 값 : (result, elaspsed) 또는 TImeoutError raise
+    '''
+    queue = multiprocessing.Queue()
+    proc = multiprocessing.Process(target=_worker, args=(fn, args, queue))
+
+    t_start = time.time()
+    proc.start()
+    proc.join(timeout=timeout)
+    elapsed = time.time() - t_start
+
+    if proc.is_alive():
+        proc.terminate()  # 30초 초과 → 프로세스 강제 종료
+        proc.join()
+        raise concurrent.futures.TimeoutError()
+
+    status, result = queue.get()
+    if status == "error":
+        raise RuntimeError(result)
+    
+    
+    return result, elapsed
 
 
 # ========================================
@@ -391,6 +433,7 @@ def extract_hwpx(file_path):
 def process_file(data):
     
     results = []
+    skipped_files = []  # 추가
 
     files = data.get("files", [])
 
@@ -417,24 +460,60 @@ def process_file(data):
             with open(tmp_path, "wb") as f:
                 f.write(r.content)
 
+            # timed_out 초기화
+            timed_out = False
+
+            # ----- 파싱 (파일 형식 별 타임아웃 적용) -----
             if ext == ".pdf":
-                lines = extract_pdf(tmp_path)
+                try:
+                    lines, elapsed = run_parse_time(extract_pdf, tmp_path)
+                    sentences = split_sentences(lines)
+                    print(f"[PDF] 파싱 완료: {file_name} ({elapsed:.2f}초)")
+                except concurrent.futures.TimeoutError:
+                    timed_out = True
 
             elif ext in [".xls", ".xlsx"]:
-                lines = extract_excel(tmp_path)
+                try:
+                    lines, elapsed = run_parse_time(extract_excel, tmp_path)
+                    sentences = split_sentences(lines)
+                    print(f"[EXCEL] 파싱 완료: {file_name} ({elapsed:.2f}초)")
+                except concurrent.futures.TimeoutError:
+                    timed_out = True
 
-                        elif ext == ".hwp":
-                lines = extract_hwp(path)
-                sentences = split_sentences(lines)
+            elif ext == ".hwp":
+                try:
+                    lines, elapsed = run_parse_time(extract_hwp, tmp_path)
+                    sentences = split_sentences(lines)
+                    print(f"[HWP] 파싱 완료: {file_name} ({elapsed:.2f}초)")
+                except concurrent.futures.TimeoutError:
+                    timed_out = True
 
             elif ext == ".hwpx":
-                normal_lines, table_lines = extract_hwpx(path)
-                sentences = split_sentences(normal_lines)
-
-                sentences.extend(table_lines)
+                try:
+                    (normal_lines, table_lines), elapsed = run_parse_time(extract_hwpx, tmp_path)
+                    sentences = split_sentences(normal_lines)
+                    table_sentences = [
+                        {"sentenceId": len(sentences) + i + 1, "sentence": t}
+                        for i, t in enumerate(table_lines)
+                    ]
+                    sentences.extend(table_sentences)
+                    print(f"[HWPX] 파싱 완료: {file_name} ({elapsed:.2f}초)")
+                except concurrent.futures.TimeoutError:
+                    timed_out = True
 
             else:
                 sentences = []
+
+            # ----- 타임아웃 스킵 -----
+            if timed_out:
+                print(f"[TIMEOUT] 파싱 {PARSE_TIMEOUT_SECONDS}초 초과, 스킵: {file_name}")
+                skipped_files.append({
+                    "bidNtceNo": bid_id,
+                    "fileName": file_name,
+                    "fileUrl": file_url,
+                    "reason": f"파싱 타임아웃 ({PARSE_TIMEOUT_SECONDS}초 초과)"
+                })
+                continue
 
             results.append({
                 "bidNtceNo": bid_id,
@@ -450,4 +529,5 @@ def process_file(data):
                 except PermissionError:
                     pass
 
-    return results
+    # results, skip 파일 목록 반환
+    return results, skipped_files
