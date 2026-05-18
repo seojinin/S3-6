@@ -21,10 +21,12 @@ header {
 .header-inner {
     max-width: 1280px;
     margin: auto;
-    padding: 20px 24px;
+    padding: 0 24px;
+    height: 80px;        /* 헤더 높이 고정 */
     display: flex;
     justify-content: space-between;
     align-items: center;
+    overflow: hidden;    /* 로고가 넘쳐도 헤더 크기 유지 */
 }
 
 .logo {
