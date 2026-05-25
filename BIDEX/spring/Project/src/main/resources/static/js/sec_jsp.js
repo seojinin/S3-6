@@ -332,6 +332,19 @@ window.addEventListener('popstate', (e) => {
     showPage(id, false);
 });
 
+// ===== 마이페이지 탭 전환 =====
+function switchMpTab(tab) {
+    // 탭 버튼 active 처리
+    ['info','keyword','noti'].forEach(t => {
+        const btn  = document.getElementById(`mpTab-${t}`);
+        const side = document.getElementById(`mpSide-${t}`);
+        const panel = document.getElementById(`mpPanel-${t}`);
+        if (btn)   btn.classList.toggle('active',   t === tab);
+        if (side)  side.classList.toggle('active',  t === tab);
+        if (panel) panel.classList.toggle('active', t === tab);
+    });
+}
+
 // ===== 로딩/에러 =====
 function showTableLoading(tableId, cols) {
     const t = document.getElementById(tableId); if (!t) return;
@@ -416,7 +429,6 @@ function loadUserKeywords() {
     const kws=DB.getUserKeywords();
     document.getElementById('keywordList').innerHTML = kws.length===0
         ? '<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'
-        // ★ 클릭 시 입찰공고 검색으로 이동
         : kws.map(kw=>`<div class="keyword-item" onclick="searchByKeyword('${kw}')"><span class="keyword-item-text">${kw}</span></div>`).join('');
     loadMypageKeywordList();
 }
@@ -552,14 +564,9 @@ function deleteKeyword(kw) {
     if (confirm('삭제하시겠습니까?')) { DB.updateUserKeywords(DB.getUserKeywords().filter(k=>k!==kw)); loadUserKeywords(); updateBidStats(); }
 }
 
-// ===== 알림 (마이페이지) =====
-function loadNotifications() {
-    fetchNotificationsFromDB();
-}
-
-function loadNotificationDropdown() {
-    fetchNotificationsFromDB();
-}
+// ===== 알림 =====
+function loadNotifications() { fetchNotificationsFromDB(); }
+function loadNotificationDropdown() { fetchNotificationsFromDB(); }
 
 async function fetchNotificationsFromDB() {
     const memberId = 1;
@@ -570,7 +577,6 @@ async function fetchNotificationsFromDB() {
             renderNotifications(notis);
         }
     } catch(e) {
-        // 백엔드 알림 API 없으면 localStorage 알림으로 폴백
         renderLocalNotifications();
     }
 }
