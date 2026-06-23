@@ -7,9 +7,12 @@ import pj.notice.model.NoticeEntityModel;
 
 public interface NoticeEntityServiceIF {
 
-    void saveBulk(NoticeEntityBulkRequest request);
+	void saveBulk(NoticeEntityBulkRequest request);
 
-    List<NoticeEntityModel> searchByKeyword(String keyword);
+	List<NoticeEntityModel> searchByKeyword(String keyword);
 
 	List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber);
+
+	List<NoticeEntityModel> searchByKeywords(List<String> keywords);
+
 }

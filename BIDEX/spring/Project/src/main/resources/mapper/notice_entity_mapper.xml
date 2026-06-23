@@ -39,6 +39,28 @@
 	       OR e.entity_value LIKE CONCAT('%', #{keyword}, '%') -- NER 키워드 검색
 	    ORDER BY n.created_at DESC
 	</select>
+
+	<!-- 다중 키워드 검색 -->
+	<select id="searchByKeywords" resultType="pj.notice.model.NoticeEntityModel">
+	    SELECT DISTINCT
+	        e.entity_id,
+	        e.notice_number,
+	        e.entity_value,
+	        e.entity_type,
+	        e.file_name,
+	        n.notice_title,
+	        e.file_url
+	
+	    FROM tb_notice n
+	    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+	
+	    WHERE
+	    <foreach collection="keywords" item="keyword" separator=" OR ">
+	        n.notice_title LIKE CONCAT('%', #{keyword}, '%')
+	        OR e.entity_value LIKE CONCAT('%', #{keyword}, '%')
+	    </foreach>
+	    ORDER BY n.created_at DESC
+	</select>
 	
 	<!-- 키워드 사전 저장(없을 때) -->
 	<insert id="insertKeyword">

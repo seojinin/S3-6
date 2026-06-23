@@ -15,6 +15,9 @@ public interface NoticeEntityMapper {
 
 	List<NoticeEntityModel> searchByKeyword(String keyword);
 
+	// 다중 키워드 검색
+	List<NoticeEntityModel> searchByKeywords(List<String> keywords);
+
 	List<NoticeEntityModel> selectByNoticeNumber(String noticeNumber);
 
 	// 키워드 없으면 저장

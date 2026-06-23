@@ -1,5 +1,6 @@
 package pj.notice.controller;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,8 +45,22 @@ public class NoticeEntityController {
 	    return service.getEntitiesByNoticeNumber(noticeNumber);
 	}
 
+//	@GetMapping("/entities/search")
+//	public List<NoticeEntityModel> search(@RequestParam String keyword) {
+//		return service.searchByKeyword(keyword);
+//	}
+
 	@GetMapping("/entities/search")
-	public List<NoticeEntityModel> search(@RequestParam String keyword) {
-		return service.searchByKeyword(keyword);
+	public List<NoticeEntityModel> search(
+	        @RequestParam String keyword) {
+
+	    List<String> keywords =
+	            Arrays.stream(keyword.split("/"))
+	                  .map(String::trim)
+	                  .filter(s -> !s.isEmpty())
+	                  .toList();
+
+	    return service.searchByKeywords(keywords);
 	}
+
 }

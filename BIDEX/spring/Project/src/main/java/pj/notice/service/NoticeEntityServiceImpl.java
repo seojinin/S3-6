@@ -123,4 +123,10 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 	public List<NoticeEntityModel> searchByKeyword(String keyword) {
 		return entityMapper.searchByKeyword(keyword);
 	}
+
+	@Override
+	public List<NoticeEntityModel> searchByKeywords(List<String> keywords) {
+		return entityMapper.searchByKeywords(keywords);
+	}
+
 }

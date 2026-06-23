@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="pj.notice.mapper.NoticeMapper">
+
+	<insert id="insertNotice">
+	    insert ignore into tb_notice
+	    (notice_number, notice_title, contract_method, amount, agency, region, demand_agency)
+	    values
+	    (#{notice_number}, #{notice_title}, #{contract_method}, #{amount}, #{agency}, #{region}, #{demand_agency})
+	</insert>
+
+	<select id="selectNoticeById" resultType="pj.notice.model.NoticeModel">
+		select *
+		from tb_notice
+		where notice_id = #{notice_id}
+	</select>
+
+	<!-- 키워드 검색도 가능하게 하려고 수정 -->
+	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
+		SELECT
+		    n.*,
+		    GROUP_CONCAT(DISTINCT e.entity_value SEPARATOR ', ') AS entity_value,
+		    -- DISTINCT를 추가하여 중복 파일명 제거
+		    GROUP_CONCAT(DISTINCT e.file_name SEPARATOR ',') AS file_name,
+		    -- DISTINCT를 추가하여 중복 URL 제거
+		    GROUP_CONCAT(DISTINCT e.file_url SEPARATOR ',') AS file_url
+		FROM tb_notice n
+		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+		GROUP BY n.notice_id;
+	</select>
+</mapper>
