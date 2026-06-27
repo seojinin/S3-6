@@ -38,20 +38,16 @@ CREATE TABLE tb_notice_entity (
     UNIQUE KEY uniq_entity (notice_number, entity_value, entity_type, file_name)
 ) CHARACTER SET utf8mb4;
 
--- 회원 정보 저장
+-- 회원 정보 저장(폼 로그인)
 CREATE TABLE tb_member (
     member_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(100) UNIQUE,
+    login_id VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    username VARCHAR(100) NOT NULL,
     email VARCHAR(255),
     phone VARCHAR(50),
-    provider VARCHAR(20),                 -- 'google', 'kakao', 'naver' 구분
-    provider_id VARCHAR(255),              -- 소셜 서비스의 고유 ID (UUID)
-    profile_image VARCHAR(500),            -- 사용자 프로필 사진 URL
     role VARCHAR(20) DEFAULT 'ROLE_USER',  -- 스프링 시큐리티 권한 관리용
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- 중복 가입 방지 (소셜 공급자와 ID 조합)
-    UNIQUE KEY uniq_social (provider, provider_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) CHARACTER SET utf8mb4;
 
 -- 키워드 사전(대표어 관리)
