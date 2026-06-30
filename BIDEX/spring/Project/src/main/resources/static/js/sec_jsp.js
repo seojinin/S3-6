@@ -67,16 +67,48 @@ let totalCount = 0;
 let currentPage = 1;
 const itemsPerPage = 10;
 
+// ===== 다중 키워드 검색 상태 =====
+let searchKeywords = [];
+
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function renderSearchChips() {
+    const wrap = document.getElementById('searchChipWrap');
+    if (!wrap) return;
+    wrap.innerHTML = searchKeywords.map(kw => `
+        <span class="search-chip">${kw}<button onclick="removeSearchKeyword('${kw.replace(/'/g, "\\'")}')">×</button></span>
+    `).join('');
+}
+
+// 입력값을 검색 키워드 목록에 추가 (중복/공백 제외)
+function addSearchKeyword(raw) {
+    const kw = (raw || '').trim();
+    if (!kw) return false;
+    if (searchKeywords.includes(kw)) return false;
+    searchKeywords.push(kw);
+    renderSearchChips();
+    return true;
+}
+
+function removeSearchKeyword(kw) {
+    searchKeywords = searchKeywords.filter(k => k !== kw);
+    renderSearchChips();
+    searchBids();
+}
+
 // ===== 목록 상태 저장/복원 =====
 let savedBidState = null;
 
 function saveBidState() {
     savedBidState = {
-        page:         currentPage,
-        searchInput:  document.getElementById('searchInput')?.value  || '',
-        regionFilter: document.getElementById('regionFilter')?.value || '',
-        methodFilter: document.getElementById('methodFilter')?.value || '',
-        agencyFilter: document.getElementById('agencyFilter')?.value || '',
+        page:           currentPage,
+        searchInput:    document.getElementById('searchInput')?.value  || '',
+        searchKeywords: [...searchKeywords],
+        regionFilter:   document.getElementById('regionFilter')?.value || '',
+        methodFilter:   document.getElementById('methodFilter')?.value || '',
+        agencyFilter:   document.getElementById('agencyFilter')?.value || '',
     };
 }
 
@@ -86,8 +118,14 @@ function restoreBidState() {
     if (document.getElementById('regionFilter')) document.getElementById('regionFilter').value = savedBidState.regionFilter;
     if (document.getElementById('methodFilter')) document.getElementById('methodFilter').value = savedBidState.methodFilter;
     if (document.getElementById('agencyFilter')) document.getElementById('agencyFilter').value = savedBidState.agencyFilter;
-    fetchBidList(savedBidState.page);
+
+    searchKeywords = savedBidState.searchKeywords || [];
+    renderSearchChips();
+
+    const page = savedBidState.page;
     savedBidState = null;
+
+    fetchBidList(page).then(() => { if (searchKeywords.length > 0) searchBids(); });
     return true;
 }
 
@@ -163,7 +201,9 @@ function renderBidTable() {
     const table = document.getElementById('bidTable');
     while (table.rows.length > 1) table.deleteRow(1);
 
-    const searchTerm = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
+    // 칩으로 추가된 다중 키워드가 있으면 그것들을, 없으면 입력창의 텍스트를 하이라이트 대상으로 사용
+    const inputTerm = document.getElementById('searchInput')?.value.trim() || '';
+    const highlightTerms = searchKeywords.length > 0 ? searchKeywords : (inputTerm ? [inputTerm] : []);
 
     if (apiData.length === 0) {
         const row = table.insertRow(); const cell = row.insertCell(0);
@@ -185,8 +225,9 @@ function renderBidTable() {
         row.insertCell(0).textContent = i + 1;
 
         const titleCell = row.insertCell(1);
-        if (searchTerm) {
-            const regex = new RegExp(`(${searchTerm})`, 'gi');
+        if (highlightTerms.length > 0) {
+            const pattern = highlightTerms.map(escapeRegExp).join('|');
+            const regex = new RegExp(`(${pattern})`, 'gi');
             titleCell.innerHTML = (item.notice_title || '-').replace(regex, '<span class="highlight">$1</span>');
         } else {
             titleCell.textContent = item.notice_title || '-';
@@ -298,23 +339,84 @@ function updateBidStats() {
 }
 
 // ===== 검색/필터 =====
-function searchBids() { applySearchFilter(); currentPage = 1; renderBidTable(); renderPagination(); }
-function handleSearchEnter(e) { if (e.key === 'Enter') searchBids(); }
+
+// 입력창에 남은 텍스트를 칩으로 추가하고 비움
+function commitPendingSearchInput() {
+    const input = document.getElementById('searchInput');
+    if (input && input.value.trim()) {
+        addSearchKeyword(input.value);
+        input.value = '';
+    }
+}
+
+// 다중 키워드 검색 (백엔드 /api/notices/entities/search?keyword=A/B/C 연동)
+async function searchBids() {
+    commitPendingSearchInput();
+    currentPage = 1;
+
+    // 활성화된 검색 키워드가 없으면 전체 목록을 그대로 보여줌
+    if (searchKeywords.length === 0) {
+        applySearchFilter();
+        renderBidTable();
+        renderPagination();
+        return;
+    }
+
+    showTableLoading('bidTable', 7);
+
+    try {
+        const query = searchKeywords.map(encodeURIComponent).join('/');
+        const res = await fetch(`http://localhost:8080/api/notices/entities/search?keyword=${query}`);
+        if (!res.ok) throw new Error('검색 API 응답 오류');
+        const results = await res.json();
+
+        // 검색 결과(엔티티 단위 row)에서 매칭된 공고번호만 추려서 allData와 매칭
+        const matchedNumbers = new Set(results.map(r => r.notice_number).filter(Boolean));
+        apiData    = allData.filter(item => matchedNumbers.has(item.notice_number));
+        totalCount = apiData.length;
+
+        renderBidTable();
+        renderPagination();
+    } catch (e) {
+        console.error('다중 키워드 검색 API 호출 실패, 로컬 검색으로 대체합니다:', e);
+        applySearchFilterMultiLocal();
+        renderBidTable();
+        renderPagination();
+    }
+}
+
+// 백엔드 검색이 실패했을 때를 위한 로컬(클라이언트) 다중 키워드 대체 검색
+function applySearchFilterMultiLocal() {
+    apiData = allData.filter(item => {
+        const title    = (item.notice_title || '').toLowerCase();
+        const keywords = (item.entity_value || '').toLowerCase();
+        return searchKeywords.some(kw => {
+            const k = kw.toLowerCase();
+            return title.includes(k) || keywords.includes(k);
+        });
+    });
+    totalCount = apiData.length;
+}
+
+function handleSearchEnter(e) {
+    if (e.key === 'Enter') searchBids();
+}
 function applyFilters()       { searchBids(); }
 function clearFilters() {
     ['regionFilter','methodFilter','agencyFilter'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('searchInput').value = '';
+    searchKeywords = [];
+    renderSearchChips();
     applySearchFilter(); currentPage = 1; renderBidTable(); renderPagination();
 }
 
-// ===== 메인페이지 키워드 클릭 → 입찰공고 검색 =====
+// ===== 메인페이지 키워드 클릭 → 입찰공고 검색 (다중 검색 API 사용) =====
 function searchByKeyword(keyword) {
-    document.getElementById('searchInput').value = keyword;
     showPage('bid');
-    applySearchFilter();
-    currentPage = 1;
-    renderBidTable();
-    renderPagination();
+    document.getElementById('searchInput').value = '';
+    searchKeywords = [keyword];
+    renderSearchChips();
+    searchBids();
 }
 
 // ===== 페이지 전환 =====
