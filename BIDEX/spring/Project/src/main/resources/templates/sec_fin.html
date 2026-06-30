@@ -1,21 +1,216 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko">
 <head>
 <meta charset="UTF-8">
 <title>S3-6 입찰공고 플랫폼</title>
-
-<!-- Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
 
-<link rel="stylesheet" th:href="@{/css/sec_style.css}">
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Sans KR', sans-serif; }
+body { background: #f6f7f9; color: #222; }
 
+header { background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+.header-inner { max-width: 1280px; margin: auto; padding: 0 24px; height: 80px; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: #2563eb; }
+nav a { margin-left: 24px; margin-right: 10px; text-decoration: none; color: #444; font-size: 17px; cursor: pointer; }
+nav a:hover { color: #2563eb; }
+
+.notification-bell { position: relative; margin-left: 24px; cursor: pointer; font-size: 18px; color: #444; display: none; }
+.notification-bell.show { display: inline-block; }
+.notification-badge { position: absolute; top: -5px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+
+.notification-dropdown { position: absolute; top: 80px; right: 24px; width: 360px; background: white; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); display: none; max-height: 400px; overflow-y: auto; z-index: 100; }
+.notification-dropdown.show { display: block; }
+.notification-dropdown-header { padding: 16px; border-bottom: 1px solid #e5e7eb; font-weight: 600; font-size: 14px; }
+.notification-dropdown-item { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 13px; cursor: pointer; }
+.notification-dropdown-item:hover { background: #f9fafb; }
+.notification-dropdown-empty { padding: 40px; text-align: center; color: #9ca3af; font-size: 14px; }
+
+.container { max-width: 1280px; margin: auto; padding: 40px 24px; }
+section { display: none; }
+section.active { display: block; }
+
+/* Hero */
+.hero { display: flex; justify-content: space-between; align-items: stretch; background: #ffffff; padding: 48px; border-radius: 16px; gap: 40px; }
+.hero-text { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.hero-text h1 { font-size: 40px; margin-bottom: 16px; }
+.hero-text p { font-size: 16px; color: #555; margin-bottom: 32px; }
+.hero-text button { padding: 14px 22px; font-size: 14px; border-radius: 10px; border: none; cursor: pointer; }
+.btn-primary { background: #2563eb; color: #fff; margin-right: 12px; }
+.btn-outline { background: transparent; border: 1px solid #ccc !important; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-outline:hover { background: #f5f5f5; }
+
+.keyword-panel { flex: 1; background: #f8f9fa; border-radius: 12px; padding: 32px; display: none; }
+.keyword-panel.show { display: block; }
+.keyword-panel h3 { margin-bottom: 8px; font-size: 18px; }
+.keyword-panel > p { font-size: 13px; color: #666; margin-bottom: 20px; }
+
+.keyword-input-box { display: flex; gap: 8px; margin-bottom: 20px; }
+.keyword-input-box input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; }
+.keyword-input-box button { padding: 12px 16px; border: none; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; }
+
+.keyword-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.keyword-item { background: #f3f4f6; padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; cursor: pointer; transition: background 0.2s; gap: 8px; }
+.keyword-item:hover { background: #e5e7eb; }
+.keyword-item-checkbox { width: 18px; height: 18px; cursor: pointer; }
+.keyword-item-text { flex: 1; }
+.keyword-item-delete { background: transparent; border: none; color: #9ca3af; cursor: pointer; font-size: 14px; padding: 0 4px; display: none; }
+.keyword-item-delete:hover { color: #ef4444; }
+.keyword-item.edit-mode { cursor: default; }
+.keyword-item.edit-mode:hover { background: #f3f4f6; }
+.keyword-item.edit-mode .keyword-item-delete { display: block; }
+.keyword-item.checked { background: #dbeafe; border: 1px solid #3b82f6; }
+.keyword-item.checked:hover { background: #bfdbfe; }
+
+.keyword-add-btn { background: transparent; border: none; padding: 8px; border-radius: 8px; display: none; align-items: center; justify-content: center; cursor: pointer; font-size: 32px; font-weight: 700; color: #2563eb; }
+.keyword-add-btn:hover { color: #1d4ed8; }
+.keyword-add-btn.show { display: flex; }
+
+.mypage-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
+.mypage-section-header h2 { margin: 0; border: none; padding: 0; }
+.keyword-edit-buttons { display: flex; gap: 8px; }
+.keyword-edit-buttons button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.btn-edit { background: #2563eb; color: white; }
+.btn-confirm { background: #10b981; color: white; }
+.btn-bulk-delete { background: #ef4444; color: white; }
+
+.feature-box { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 40px; }
+.feature-card { background: #ffffff; padding: 28px; border-radius: 14px; }
+.feature-card h3 { margin-bottom: 10px; font-size: 16px; }
+.feature-card p { font-size: 14px; color: #666; }
+
+.main-bid-section { margin-top: 60px; }
+.main-bid-section h2 { font-size: 28px; margin-bottom: 24px; }
+.more-btn-container { text-align: center; margin-top: 24px; }
+.more-btn { padding: 14px 32px; border: 1px solid #ccc; background: #fff; border-radius: 8px; cursor: pointer; font-size: 14px; color: #444; }
+.more-btn:hover { background: #f5f5f5; }
+
+/* Bid List */
+.search-bar { display: flex; margin-bottom: 24px; }
+.search-bar input { flex: 1; padding: 14px; border-radius: 8px; border: 1px solid #ccc; }
+.search-bar button { margin-left: 10px; padding: 14px 20px; border: none; background: #2563eb; color: #fff; border-radius: 8px; cursor: pointer; }
+.search-bar button:hover { background: #1d4ed8; }
+
+.search-input-col { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.search-input-col input { flex: none; width: 100%; }
+.search-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.search-chip { display: inline-flex; align-items: center; background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; border-radius: 20px; padding: 4px 12px; font-size: 13px; font-weight: 500; gap: 6px; }
+.search-chip button { background: none; border: none; color: #93c5fd; font-size: 15px; cursor: pointer; padding: 0; line-height: 1; }
+.search-chip button:hover { color: #2563eb; }
+
+.table-wrap { background: #ffffff; border-radius: 16px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #f1f5f9; padding: 14px; font-size: 14px; }
+td { padding: 14px; border-top: 1px solid #eee; font-size: 14px; text-align: center; }
+tr:hover td { background: #f9fafb; }
+.highlight { background: #ffeb3b; font-weight: 600; }
+
+/* Login */
+.login-box { width: 420px; margin: 80px auto; background: #ffffff; padding: 36px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.07); }
+.login-box h2 { margin-bottom: 20px; }
+.login-box input { width: 100%; padding: 14px; margin-bottom: 16px; border-radius: 8px; border: 1px solid #ccc; font-family: inherit; }
+.login-btn { width: 100%; padding: 14px; border: none; background: #2563eb; color: #fff; border-radius: 8px; font-size: 15px; cursor: pointer; }
+.login-btn:hover { background: #1d4ed8; }
+.login-links { margin-top: 16px; text-align: center; font-size: 13px; }
+.login-links a { color: #2563eb; text-decoration: none; margin: 0 4px; cursor: pointer; }
+.login-links span { color: #aaa; }
+
+/* MyPage - Sidebar Layout */
+.mypage-container { display: flex; gap: 0; max-width: 1000px; margin: auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,0.07); min-height: 480px; }
+
+/* 왼쪽 사이드바 */
+.mypage-sidebar { width: 200px; flex-shrink: 0; background: #f1f3f8; padding: 24px 0; border-right: 1px solid #e5e7eb; }
+.mypage-sidebar-item { padding: 14px 28px; font-size: 15px; color: #555; cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; }
+.mypage-sidebar-item:hover { background: #e8eaf2; color: #2563eb; }
+.mypage-sidebar-item.active { background: #fff; color: #2563eb; font-weight: 700; border-left: 3px solid #2563eb; }
+
+/* 오른쪽 패널 */
+.mypage-panel { flex: 1; padding: 32px; }
+
+/* 아코디언 패널 */
+.mypage-accordion { display: none; }
+.mypage-accordion.active { display: block; }
+
+/* 패널 헤더 (토글) */
+.accordion-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 2px solid #2563eb; margin-bottom: 24px; cursor: pointer; }
+.accordion-header h2 { font-size: 20px; margin: 0; }
+.accordion-header .toggle-icon { font-size: 18px; color: #888; transition: transform 0.2s; }
+.accordion-header.open .toggle-icon { transform: rotate(180deg); }
+
+.user-info-grid { display: grid; grid-template-columns: 150px 1fr; gap: 16px; font-size: 14px; }
+.user-info-label { font-weight: 600; color: #555; }
+.notification-item { background: #f0f9ff; border-left: 4px solid #2563eb; padding: 16px; margin-bottom: 12px; border-radius: 4px; position: relative; }
+.notification-item strong { color: #2563eb; }
+.notification-item .date { font-size: 12px; color: #999; margin-left: 8px; }
+.notification-item .delete-noti { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #999; cursor: pointer; font-size: 18px; padding: 4px 8px; }
+.notification-item .delete-noti:hover { color: #e53e3e; }
+.no-notification { text-align: center; padding: 40px; color: #999; }
+
+.bid-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.stat-card { background: #ffffff; border: 1px solid #e5e7eb; padding: 24px; border-radius: 12px; text-align: center; }
+.stat-card .stat-number { font-size: 32px; font-weight: 700; margin-bottom: 8px; color: #1f2937; }
+.stat-card .stat-label { font-size: 13px; color: #6b7280; }
+
+.filter-bar { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+.filter-bar select { padding: 10px 14px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; background: white; cursor: pointer; font-family: inherit; }
+.clear-filters { padding: 10px 20px; border: 1px solid #ccc; border-radius: 8px; background: white; cursor: pointer; font-size: 14px; font-family: inherit; }
+.clear-filters:hover { background: #f5f5f5; }
+
+.pagination { display: flex; justify-content: center; gap: 8px; margin-top: 24px; }
+.pagination button { padding: 8px 14px; border: 1px solid #ccc; background: white; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; }
+.pagination button:hover:not(:disabled) { background: #f5f5f5; }
+.pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+.pagination button.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+.keyword-badge { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 12px; margin: 4px; }
+
+/* Modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+.modal.show { display: flex; }
+.modal-content { background: #ffffff; width: 520px; padding: 32px; border-radius: 16px; position: relative; max-height: 80vh; overflow-y: auto; }
+.modal-content.small { width: 400px; }
+.modal-content h3 { margin-bottom: 8px; font-size: 20px; }
+.modal-content > p { font-size: 14px; color: #666; margin-bottom: 20px; }
+.close-btn { position: absolute; top: 20px; right: 20px; background: transparent; border: none; font-size: 24px; cursor: pointer; color: #999; }
+.modal-buttons { display: flex; gap: 10px; margin-top: 24px; }
+.modal-buttons button { flex: 1; padding: 14px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-family: inherit; }
+.btn-cancel { background: #e5e7eb; color: #444; }
+.bulk-delete-list { max-height: 300px; overflow-y: auto; margin: 20px 0; }
+.bulk-delete-item { padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+.bulk-delete-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+
+.alert-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1001; }
+.alert-modal.show { display: flex; }
+.alert-content { background: #ffffff; width: 360px; padding: 32px; border-radius: 16px; text-align: center; }
+.alert-content p { font-size: 16px; margin-bottom: 24px; }
+.alert-content button { padding: 12px 32px; border: none; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; font-size: 15px; font-family: inherit; }
+
+/* Bid Detail */
+.back-btn { display: inline-block; margin-bottom: 20px; padding: 8px 18px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer; font-size: 14px; color: #374151; transition: background 0.2s; font-family: inherit; }
+.back-btn:hover { background: #e5e7eb; }
+.detail-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 32px 40px; }
+.detail-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 24px; color: #111827; }
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table tr { border-bottom: 1px solid #f3f4f6; }
+.detail-table td { padding: 14px 16px; font-size: 15px; color: #374151; vertical-align: middle; }
+.detail-label { width: 140px; color: #6b7280; font-weight: 500; text-align: right; padding-right: 24px !important; }
+.detail-table a { color: #2563eb; text-decoration: none; }
+.detail-table a:hover { text-decoration: underline; }
+.loading-row td { text-align: center; padding: 40px !important; color: #9ca3af; font-size: 15px; }
+
+/* Demo banner */
+.demo-banner { background: #fef3c7; border: 1px solid #f59e0b; padding: 10px 20px; text-align: center; font-size: 13px; color: #92400e; }
+</style>
 </head>
-
 <body>
+
+<div class="demo-banner">⚠️ 미리보기 모드 — 백엔드 API 없이 샘플 데이터로 동작합니다. (다중 키워드 검색 지원)</div>
 
 <header>
     <div class="header-inner">
-        <div class="logo" onclick="showPage('main')" style="cursor: pointer;"><img src="/img/1stExSample.png" alt="로고" style="height:100px;vertical-align:middle;"></div>
+        <img src="이미지경로/1stExSample.png" alt="S3-6 로고" class="logo" onclick="showPage('main')" style="cursor: pointer;">
         <nav>
             <a onclick="showPage('main')">홈</a>
             <a onclick="showPage('bid')">입찰공고 검색</a>
@@ -42,53 +237,30 @@
     <div class="hero">
         <div class="hero-text">
             <h1>입찰공고를 더 스마트하게</h1>
-            <p>
-                관심 키워드 기반으로 필요한 입찰 정보만<br>
-                빠르고 정확하게 확인하세요.
-            </p>
+            <p>관심 키워드 기반으로 필요한 입찰 정보만<br>빠르고 정확하게 확인하세요.</p>
             <div>
                 <button class="btn-primary" onclick="showPage('bid')">입찰공고 보기</button>
                 <button class="btn-outline" onclick="showPage('login')">로그인</button>
             </div>
         </div>
-
-        <!-- 관심 키워드 등록 패널 (Hero 오른쪽) -->
         <div class="keyword-panel" id="mainKeywordPanel">
             <h3 onclick="showPage('mypage')" style="cursor: pointer;">관심 키워드 목록</h3>
             <p>현재 등록된 관심 키워드입니다.</p>
-
             <div class="keyword-list" id="keywordList"></div>
         </div>
     </div>
 
     <div class="feature-box">
-        <div class="feature-card">
-            <h3>🎯 키워드 맞춤 추천</h3>
-            <p>등록한 관심 키워드에 맞는 공고만 제공합니다.</p>
-        </div>
-        <div class="feature-card">
-            <h3>🔍 통합 검색</h3>
-            <p>여러 기관의 입찰 정보를 한 번에 검색하세요.</p>
-        </div>
-        <div class="feature-card">
-            <h3>🔔 알림 서비스</h3>
-            <p>새로운 공고를 놓치지 않도록 알려드립니다.</p>
-        </div>
+        <div class="feature-card"><h3>🎯 키워드 맞춤 추천</h3><p>등록한 관심 키워드에 맞는 공고만 제공합니다.</p></div>
+        <div class="feature-card"><h3>🔍 통합 검색</h3><p>여러 기관의 입찰 정보를 한 번에 검색하세요.</p></div>
+        <div class="feature-card"><h3>🔔 알림 서비스</h3><p>새로운 공고를 놓치지 않도록 알려드립니다.</p></div>
     </div>
 
-    <!-- 홈 하단 입찰공고 리스트 -->
     <div class="main-bid-section">
         <h2>최근 입찰공고</h2>
         <div class="table-wrap">
             <table id="mainBidTable">
-                <tr>
-                    <th>번호</th>
-                    <th>공고명</th>
-                    <th>계약방법</th>
-                    <th>금액</th>
-                    <th>지역</th>
-                    <th>기관</th>
-                </tr>
+                <tr><th>번호</th><th>공고명</th><th>계약방법</th><th>금액</th><th>지역</th><th>기관</th></tr>
             </table>
         </div>
         <div class="more-btn-container">
@@ -99,125 +271,110 @@
 
 <!-- ===== Bid List ===== -->
 <section id="bid">
-    <!-- 통계 카드 -->
     <div class="bid-stats">
-        <div class="stat-card">
-            <div class="stat-number" id="totalBids">0</div>
-            <div class="stat-label">전체 공고</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" id="todayBids">0</div>
-            <div class="stat-label">오늘 등록</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" id="matchedBids">0</div>
-            <div class="stat-label">키워드 매칭</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" id="avgAmount">0억</div>
-            <div class="stat-label">평균 금액</div>
-        </div>
+        <div class="stat-card"><div class="stat-number" id="totalBids">0</div><div class="stat-label">전체 공고</div></div>
+        <div class="stat-card"><div class="stat-number" id="todayBids">0</div><div class="stat-label">오늘 등록</div></div>
+        <div class="stat-card"><div class="stat-number" id="matchedBids">0</div><div class="stat-label">키워드 매칭</div></div>
+        <div class="stat-card"><div class="stat-number" id="avgAmount">0억</div><div class="stat-label">평균 금액</div></div>
     </div>
-
-    <!-- 필터 바 -->
     <div class="filter-bar">
         <select id="regionFilter" onchange="applyFilters()">
             <option value="">전체 지역</option>
-            <option value="서울">서울</option>
-            <option value="경기">경기</option>
-            <option value="부산">부산</option>
-            <option value="대전">대전</option>
-            <option value="인천">인천</option>
-            <option value="광주">광주</option>
+            <option value="서울">서울</option><option value="경기">경기</option><option value="부산">부산</option>
+            <option value="대전">대전</option><option value="인천">인천</option><option value="광주">광주</option>
         </select>
-        
         <select id="methodFilter" onchange="applyFilters()">
             <option value="">전체 계약방법</option>
-            <option value="일반경쟁">일반경쟁</option>
-            <option value="제한경쟁">제한경쟁</option>
-            <option value="협상계약">협상계약</option>
+            <option value="일반경쟁">일반경쟁</option><option value="제한경쟁">제한경쟁</option><option value="협상계약">협상계약</option>
         </select>
-        
         <select id="agencyFilter" onchange="applyFilters()">
             <option value="">전체 기관</option>
-            <option value="공공기관">공공기관</option>
-            <option value="지방자치단체">지방자치단체</option>
-            <option value="공기업">공기업</option>
-            <option value="중앙행정기관">중앙행정기관</option>
+            <option value="공공기관">공공기관</option><option value="지방자치단체">지방자치단체</option>
+            <option value="공기업">공기업</option><option value="중앙행정기관">중앙행정기관</option>
         </select>
-        
         <button class="clear-filters" onclick="clearFilters()">필터 초기화</button>
     </div>
-
     <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="공고명 또는 키워드 검색" onkeypress="handleSearchEnter(event)">
+        <div class="search-input-col">
+            <input type="text" id="searchInput" placeholder="공고명 또는 키워드 검색 (Enter로 여러 키워드 추가 가능)" onkeypress="handleSearchEnter(event)">
+            <div class="search-chip-wrap" id="searchChipWrap"></div>
+        </div>
         <button onclick="searchBids()">검색</button>
     </div>
-
     <div class="table-wrap">
         <table id="bidTable">
-            <tr>
-                <th>번호</th>
-                <th>공고명</th>
-                <th>계약방법</th>
-                <th>금액</th>
-                <th>지역</th>
-                <th>기관</th>
-                <th>첨부파일</th>
-            </tr>
+            <tr><th>번호</th><th>공고명</th><th>계약방법</th><th>금액</th><th>지역</th><th>기관</th><th>첨부파일</th></tr>
         </table>
     </div>
-    
-    <!-- 페이지네이션 -->
     <div class="pagination" id="pagination"></div>
 </section>
 
 <!-- ===== MyPage ===== -->
 <section id="mypage">
     <div class="mypage-container">
-        <!-- 회원정보 -->
-        <div class="mypage-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
-                <h2 style="margin: 0;">회원정보</h2>
-                <button onclick="toggleEditMode()" id="editBtn" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">정보 수정</button>
-            </div>
-            <div class="user-info-grid" id="userInfoGrid">
-                <div class="user-info-label">아이디</div>
-                <div id="userIdDisplay">-</div>
-                
-                <div class="user-info-label">이메일</div>
-                <div id="userEmailDisplay">-</div>
-                
-                <div class="user-info-label">전화번호</div>
-                <div id="userPhoneDisplay">-</div>
-            </div>
-            <div id="editButtons" style="display: none; margin-top: 20px; text-align: right; gap: 10px;">
-                <button onclick="cancelEdit()" style="padding: 10px 20px; background: #e5e7eb; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px;">취소</button>
-                <button onclick="saveUserInfo()" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer;">저장</button>
-            </div>
+        <!-- 왼쪽 사이드바 -->
+        <div class="mypage-sidebar">
+            <div class="mypage-sidebar-item active" id="sidebar-userinfo" onclick="selectMypageTab('userinfo')">회원정보</div>
+            <div class="mypage-sidebar-item" id="sidebar-keywords" onclick="selectMypageTab('keywords')">관심 키워드</div>
+            <div class="mypage-sidebar-item" id="sidebar-notifications" onclick="selectMypageTab('notifications')">새로운 입찰공고</div>
         </div>
 
-        <!-- 관심 키워드 -->
-        <div class="mypage-section">
-            <div class="mypage-section-header">
-                <h2>관심 키워드</h2>
-                <div class="keyword-edit-buttons">
-                    <button class="btn-edit" id="keywordEditBtn" onclick="toggleKeywordEditMode()">수정</button>
-                    <button class="btn-bulk-delete" id="keywordBulkDeleteBtn" style="display: none;" onclick="openBulkDeleteModal()">일괄 삭제</button>
+        <!-- 오른쪽 패널 -->
+        <div class="mypage-panel">
+
+            <!-- 회원정보 패널 -->
+            <div class="mypage-accordion active" id="accordion-userinfo">
+                <div class="accordion-header open" onclick="toggleAccordion('userinfo')">
+                    <h2>회원정보</h2>
+                    <span class="toggle-icon"><i class="fa-solid fa-chevron-up"></i></span>
+                </div>
+                <div id="accordion-body-userinfo">
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+                        <button onclick="toggleEditMode()" id="editBtn" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">정보 수정</button>
+                    </div>
+                    <div class="user-info-grid" id="userInfoGrid">
+                        <div class="user-info-label">아이디</div><div id="userIdDisplay">-</div>
+                        <div class="user-info-label">이메일</div><div id="userEmailDisplay">-</div>
+                        <div class="user-info-label">전화번호</div><div id="userPhoneDisplay">-</div>
+                    </div>
+                    <div id="editButtons" style="display:none;margin-top:20px;text-align:right;">
+                        <button onclick="cancelEdit()" style="padding:10px 20px;background:#e5e7eb;border:none;border-radius:6px;cursor:pointer;margin-right:8px;font-family:inherit;">취소</button>
+                        <button onclick="saveUserInfo()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-family:inherit;">저장</button>
+                    </div>
                 </div>
             </div>
-            <div class="keyword-input-box">
-                <input type="text" id="mypageKeywordInput" placeholder="키워드 입력 (예: 네트워크)" onkeypress="handleKeywordEnter(event, 'mypage')">
-                <button onclick="addMypageKeyword()">추가</button>
-            </div>
-            <div class="keyword-list" id="mypageKeywordList"></div>
-            <div class="keyword-add-btn" id="keywordAddBtn" onclick="showKeywordInputBox()">+</div>
-        </div>
 
-        <!-- 새로운 입찰공고 알림 -->
-        <div class="mypage-section">
-            <h2>새로운 입찰공고</h2>
-            <div id="notificationList"></div>
+            <!-- 관심 키워드 패널 -->
+            <div class="mypage-accordion" id="accordion-keywords">
+                <div class="accordion-header open" onclick="toggleAccordion('keywords')">
+                    <h2>관심 키워드</h2>
+                    <span class="toggle-icon"><i class="fa-solid fa-chevron-up"></i></span>
+                </div>
+                <div id="accordion-body-keywords">
+                    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+                        <button class="btn-edit" id="keywordEditBtn" onclick="toggleKeywordEditMode()">수정</button>
+                        <button class="btn-bulk-delete" id="keywordBulkDeleteBtn" style="display:none;" onclick="openBulkDeleteModal()">일괄 삭제</button>
+                    </div>
+                    <div class="keyword-input-box">
+                        <input type="text" id="mypageKeywordInput" placeholder="키워드 입력 (예: 네트워크)" onkeypress="handleKeywordEnter(event,'mypage')">
+                        <button onclick="addMypageKeyword()">추가</button>
+                    </div>
+                    <div class="keyword-list" id="mypageKeywordList"></div>
+                    <div class="keyword-add-btn" id="keywordAddBtn" onclick="showKeywordInputBox()">+</div>
+                </div>
+            </div>
+
+            <!-- 새로운 입찰공고 알림 패널 -->
+            <div class="mypage-accordion" id="accordion-notifications">
+                <div class="accordion-header open" onclick="toggleAccordion('notifications')">
+                    <h2>새로운 입찰공고 알림</h2>
+                    <span class="toggle-icon"><i class="fa-solid fa-chevron-up"></i></span>
+                </div>
+                <div id="accordion-body-notifications">
+                    <div id="notificationList"></div>
+                </div>
+            </div>
+
         </div>
     </div>
 </section>
@@ -246,37 +403,29 @@
 <section id="login">
     <div class="login-box">
         <h2>로그인</h2>
-
         <input type="text" id="loginId" placeholder="ID" onkeypress="handleLoginEnter(event)">
         <input type="password" id="loginPassword" placeholder="Password" onkeypress="handleLoginEnter(event)">
-
         <button class="login-btn" onclick="handleLogin()">로그인</button>
-
         <div class="login-links">
-            <a href="#">아이디 찾기</a>
-            <span>|</span>
-            <a href="#">비밀번호 찾기</a>
-            <span>|</span>
+            <a href="#">아이디 찾기</a><span>|</span>
+            <a href="#">비밀번호 찾기</a><span>|</span>
             <a onclick="openSignupModal()">회원가입</a>
         </div>
     </div>
 </section>
-
 </div>
 
-<!-- ===== Signup Modal ===== -->
+<!-- Signup Modal -->
 <div class="modal" id="signupModal">
     <div class="modal-content">
         <button class="close-btn" onclick="closeSignupModal()">&times;</button>
         <h3>회원가입</h3>
         <p>S3-6 입찰공고 플랫폼에 오신 것을 환영합니다.</p>
-
-        <input type="text" id="signupId" placeholder="아이디" style="width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc;">
-        <input type="password" id="signupPassword" placeholder="비밀번호" style="width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc;">
-        <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인" style="width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc;">
-        <input type="email" id="signupEmail" placeholder="이메일" style="width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ccc;">
-        <input type="tel" id="signupPhone" placeholder="전화번호 (예: 010-1234-5678)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc;">
-
+        <input type="text" id="signupId" placeholder="아이디" style="width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ccc;font-family:inherit;">
+        <input type="password" id="signupPassword" placeholder="비밀번호" style="width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ccc;font-family:inherit;">
+        <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인" style="width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ccc;font-family:inherit;">
+        <input type="email" id="signupEmail" placeholder="이메일" style="width:100%;padding:12px;margin-bottom:12px;border-radius:8px;border:1px solid #ccc;font-family:inherit;">
+        <input type="tel" id="signupPhone" placeholder="전화번호 (예: 010-1234-5678)" style="width:100%;padding:12px;border-radius:8px;border:1px solid #ccc;font-family:inherit;">
         <div class="modal-buttons">
             <button class="btn-cancel" onclick="closeSignupModal()">취소</button>
             <button class="btn-confirm" onclick="handleSignup()">가입하기</button>
@@ -284,7 +433,7 @@
     </div>
 </div>
 
-<!-- ===== Alert Modal ===== -->
+<!-- Alert Modal -->
 <div class="alert-modal" id="alertModal">
     <div class="alert-content">
         <p id="alertMessage"></p>
@@ -292,15 +441,13 @@
     </div>
 </div>
 
-<!-- ===== Bulk Delete Modal ===== -->
+<!-- Bulk Delete Modal -->
 <div class="modal" id="bulkDeleteModal">
     <div class="modal-content small">
         <button class="close-btn" onclick="closeBulkDeleteModal()">&times;</button>
         <h3>일괄 삭제</h3>
         <p>삭제할 키워드를 선택하세요.</p>
-        
         <div class="bulk-delete-list" id="bulkDeleteList"></div>
-        
         <div class="modal-buttons">
             <button class="btn-cancel" onclick="closeBulkDeleteModal()">취소</button>
             <button class="btn-confirm" onclick="confirmBulkDelete()">삭제하기</button>
@@ -308,19 +455,530 @@
     </div>
 </div>
 
-<!-- ===== Confirm Modal ===== -->
+<!-- Confirm Modal -->
 <div class="alert-modal" id="confirmModal">
     <div class="alert-content">
         <p id="confirmMessage"></p>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-            <button onclick="closeConfirm()" style="background: #e5e7eb; color: #444;">취소</button>
-            <button onclick="confirmAction()" id="confirmBtn">확인</button>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button onclick="closeConfirm()" style="background:#e5e7eb;color:#444;padding:12px 32px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-family:inherit;">취소</button>
+            <button onclick="confirmAction()" id="confirmBtn" style="padding:12px 32px;border:none;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer;font-size:15px;font-family:inherit;">확인</button>
         </div>
     </div>
 </div>
 
-<script th:src="@{/js/sec_jsp.js}"></script>
+<script>
+// ===== 샘플 데이터 (백엔드 없이 미리보기용) =====
+const MOCK_DATA = [
+    { notice_number: 'N001', notice_title: '2025년 서울시 네트워크 인프라 구축 사업', contract_method: '일반경쟁', amount: '3500000000', region: '서울', agency: '공공기관', bid_start: '20250501', bid_end: '20250601', demand_agency: '서울시청', biz_type: 'IT인프라', entity_value: '네트워크, 인프라', file_name: '입찰공고문.pdf', file_url: '#' },
+    { notice_number: 'N002', notice_title: '경기도 공공데이터 플랫폼 운영 용역', contract_method: '협상계약', amount: '1200000000', region: '경기', agency: '지방자치단체', bid_start: '20250502', bid_end: '20250602', demand_agency: '경기도청', biz_type: '소프트웨어', entity_value: '데이터, 플랫폼', file_name: null, file_url: null },
+    { notice_number: 'N003', notice_title: '부산항 스마트 물류시스템 구축', contract_method: '제한경쟁', amount: '8000000000', region: '부산', agency: '공기업', bid_start: '20250503', bid_end: '20250603', demand_agency: '부산항만공사', biz_type: '물류IT', entity_value: '물류, 스마트', file_name: '설계도면.pdf| 공고문.pdf', file_url: '#| #' },
+    { notice_number: 'N004', notice_title: '대전시 AI 기반 민원처리 시스템 개발', contract_method: '협상계약', amount: '950000000', region: '대전', agency: '지방자치단체', bid_start: '20250504', bid_end: '20250604', demand_agency: '대전시청', biz_type: 'AI/SW', entity_value: 'AI, 민원', file_name: null, file_url: null },
+    { notice_number: 'N005', notice_title: '인천공항 보안시스템 고도화 사업', contract_method: '일반경쟁', amount: '5600000000', region: '인천', agency: '공기업', bid_start: '20250505', bid_end: '20250605', demand_agency: '인천국제공항공사', biz_type: '보안', entity_value: '보안, 공항', file_name: null, file_url: null },
+    { notice_number: 'N006', notice_title: '광주 스마트시티 통합관제센터 구축', contract_method: '일반경쟁', amount: '2300000000', region: '광주', agency: '지방자치단체', bid_start: '20250506', bid_end: '20250606', demand_agency: '광주광역시청', biz_type: 'IoT/스마트시티', entity_value: '스마트시티, IoT', file_name: '공고문.pdf', file_url: '#' },
+    { notice_number: 'N007', notice_title: '서울 교육청 클라우드 전환 사업', contract_method: '협상계약', amount: '780000000', region: '서울', agency: '중앙행정기관', bid_start: '20250507', bid_end: '20250607', demand_agency: '서울시교육청', biz_type: '클라우드', entity_value: '클라우드, 교육', file_name: null, file_url: null },
+    { notice_number: 'N008', notice_title: '경기도 디지털 행정혁신 컨설팅 용역', contract_method: '제한경쟁', amount: '320000000', region: '경기', agency: '지방자치단체', bid_start: '20250508', bid_end: '20250608', demand_agency: '경기도청', biz_type: '컨설팅', entity_value: '디지털, 행정', file_name: null, file_url: null },
+    { notice_number: 'N009', notice_title: '국방부 사이버보안 체계 강화 사업', contract_method: '제한경쟁', amount: '12000000000', region: '서울', agency: '중앙행정기관', bid_start: '20250509', bid_end: '20250609', demand_agency: '국방부', biz_type: '사이버보안', entity_value: '사이버, 보안', file_name: null, file_url: null },
+    { notice_number: 'N010', notice_title: '부산시 버스정보시스템 고도화', contract_method: '일반경쟁', amount: '1500000000', region: '부산', agency: '공공기관', bid_start: '20250510', bid_end: '20250610', demand_agency: '부산시청', biz_type: '교통IT', entity_value: '버스, 교통', file_name: null, file_url: null },
+    { notice_number: 'N011', notice_title: '대전 과학기술원 연구데이터 관리시스템', contract_method: '협상계약', amount: '450000000', region: '대전', agency: '공공기관', bid_start: '20250511', bid_end: '20250611', demand_agency: 'KAIST', biz_type: '연구IT', entity_value: '연구, 데이터', file_name: null, file_url: null },
+    { notice_number: 'N012', notice_title: '인천시 드론 배송 시범사업 운영 용역', contract_method: '일반경쟁', amount: '680000000', region: '인천', agency: '지방자치단체', bid_start: '20250512', bid_end: '20250612', demand_agency: '인천시청', biz_type: '드론/물류', entity_value: '드론, 배송', file_name: null, file_url: null },
+];
 
+// ===== DB (localStorage) =====
+const DB = {
+    users: JSON.parse(localStorage.getItem('sec_users')) || [],
+    currentUser: null,
+    save() { localStorage.setItem('sec_users', JSON.stringify(this.users)); },
+    addUser(id, password, email, phone) {
+        this.users.push({ id, password, email, phone, keywords: [], keywordChecks: {}, notifications: [] });
+        this.save();
+    },
+    findUser(id, password) { return this.users.find(u => u.id === id && u.password === password); },
+    updateUserKeywords(keywords) {
+        if (this.currentUser) {
+            const user = this.users.find(u => u.id === this.currentUser.id);
+            if (user) { user.keywords = keywords; const nc = {}; keywords.forEach(kw => { if (user.keywordChecks && user.keywordChecks[kw] !== undefined) nc[kw] = user.keywordChecks[kw]; }); user.keywordChecks = nc; this.save(); }
+        }
+    },
+    getUserKeywords() { if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? u.keywords : []; } return []; },
+    getKeywordChecks() { if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? (u.keywordChecks || {}) : {}; } return {}; },
+    setKeywordCheck(keyword, checked) { if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); if (u) { if (!u.keywordChecks) u.keywordChecks = {}; u.keywordChecks[keyword] = checked; this.save(); } } },
+    addNotification(message, keyword, notice_number, notice_title) {
+        if (this.currentUser) {
+            const u = this.users.find(u => u.id === this.currentUser.id);
+            if (u) { const now = new Date(); const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`; u.notifications.push({ message, keyword, date: d, notice_number, notice_title }); this.save(); }
+        }
+    },
+    getNotifications() { if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? u.notifications : []; } return []; }
+};
 
+let allData = [], apiData = [], totalCount = 0, currentPage = 1;
+const itemsPerPage = 10;
+let savedBidState = null;
+
+// ===== 다중 키워드 검색 상태 =====
+let searchKeywords = [];
+
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function renderSearchChips() {
+    const wrap = document.getElementById('searchChipWrap');
+    if (!wrap) return;
+    wrap.innerHTML = searchKeywords.map(kw => `
+        <span class="search-chip">${kw}<button onclick="removeSearchKeyword('${kw.replace(/'/g, "\\'")}')">×</button></span>
+    `).join('');
+}
+
+function addSearchKeyword(raw) {
+    const kw = (raw || '').trim();
+    if (!kw) return false;
+    if (searchKeywords.includes(kw)) return false;
+    searchKeywords.push(kw);
+    renderSearchChips();
+    return true;
+}
+
+function removeSearchKeyword(kw) {
+    searchKeywords = searchKeywords.filter(k => k !== kw);
+    renderSearchChips();
+    searchBids();
+}
+
+function commitPendingSearchInput() {
+    const input = document.getElementById('searchInput');
+    if (input && input.value.trim()) {
+        addSearchKeyword(input.value);
+        input.value = '';
+    }
+}
+
+function saveBidState() {
+    savedBidState = {
+        page: currentPage,
+        searchInput: document.getElementById('searchInput')?.value || '',
+        searchKeywords: [...searchKeywords],
+        regionFilter: document.getElementById('regionFilter')?.value || '',
+        methodFilter: document.getElementById('methodFilter')?.value || '',
+        agencyFilter: document.getElementById('agencyFilter')?.value || ''
+    };
+}
+function restoreBidState() {
+    if (!savedBidState) return false;
+    if (document.getElementById('searchInput')) document.getElementById('searchInput').value = savedBidState.searchInput;
+    if (document.getElementById('regionFilter')) document.getElementById('regionFilter').value = savedBidState.regionFilter;
+    if (document.getElementById('methodFilter')) document.getElementById('methodFilter').value = savedBidState.methodFilter;
+    if (document.getElementById('agencyFilter')) document.getElementById('agencyFilter').value = savedBidState.agencyFilter;
+    searchKeywords = savedBidState.searchKeywords || [];
+    renderSearchChips();
+    fetchBidList(savedBidState.page); savedBidState = null; return true;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    history.replaceState({ page: 'main' }, '', '#main');
+    fetchBidList();
+    updateNotificationBadge();
+});
+
+// 샘플 데이터로 목록 로드
+async function fetchBidList(page = 1) {
+    currentPage = page;
+    // 샘플 데이터 사용
+    allData = MOCK_DATA;
+    applySearchFilter();
+    renderBidTable();
+    renderMainBidTable();
+    renderPagination();
+    updateBidStats();
+}
+
+// 다중 키워드(OR) + 지역/계약방법/기관 필터를 함께 적용
+function applySearchFilter() {
+    const region = document.getElementById('regionFilter')?.value || '';
+    const method = document.getElementById('methodFilter')?.value || '';
+    const agency = document.getElementById('agencyFilter')?.value || '';
+
+    apiData = allData.filter(item => {
+        const title = (item.notice_title || '').toLowerCase();
+        const keywords = (item.entity_value || '').toLowerCase();
+        const titleMatch = searchKeywords.length === 0 || searchKeywords.some(kw => {
+            const k = kw.toLowerCase();
+            return title.includes(k) || keywords.includes(k);
+        });
+        const regionMatch = !region || item.region === region;
+        const methodMatch = !method || item.contract_method === method;
+        const agencyMatch = !agency || item.agency === agency;
+        return titleMatch && regionMatch && methodMatch && agencyMatch;
+    });
+    totalCount = apiData.length;
+}
+
+function formatAmount(val) {
+    if (!val || val === '0') return '-';
+    const n = parseInt(val);
+    if (isNaN(n)) return '-';
+    if (n >= 100000000) return Math.round(n / 100000000) + '억';
+    if (n >= 10000) return Math.round(n / 10000) + '만';
+    return n.toLocaleString() + '원';
+}
+function formatDate(val) {
+    if (!val) return '-';
+    const s = String(val).replace(/[^0-9]/g, '');
+    if (s.length >= 8) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    return val;
+}
+
+function renderBidTable() {
+    const table = document.getElementById('bidTable');
+    while (table.rows.length > 1) table.deleteRow(1);
+
+    // 칩으로 추가된 다중 키워드가 있으면 그것들을, 없으면 입력창의 텍스트를 하이라이트 대상으로 사용
+    const inputTerm = document.getElementById('searchInput')?.value.trim() || '';
+    const highlightTerms = searchKeywords.length > 0 ? searchKeywords : (inputTerm ? [inputTerm] : []);
+
+    if (apiData.length === 0) {
+        const row = table.insertRow(); const cell = row.insertCell(0);
+        cell.colSpan = 7; cell.style.cssText = 'text-align:center;padding:40px;color:#9ca3af;';
+        cell.textContent = '검색 결과가 없습니다.'; return;
+    }
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = Math.min(start + itemsPerPage, apiData.length);
+    for (let i = start; i < end; i++) {
+        const item = apiData[i];
+        const row = table.insertRow();
+        row.style.cursor = 'pointer';
+        row.onclick = (e) => { if (e.target.tagName !== 'A') { saveBidState(); showBidDetail(item.notice_number); } };
+        row.insertCell(0).textContent = i + 1;
+        const titleCell = row.insertCell(1);
+        if (highlightTerms.length > 0) {
+            const pattern = highlightTerms.map(escapeRegExp).join('|');
+            const regex = new RegExp(`(${pattern})`, 'gi');
+            titleCell.innerHTML = (item.notice_title || '-').replace(regex, '<span class="highlight">$1</span>');
+        } else {
+            titleCell.textContent = item.notice_title || '-';
+        }
+        row.insertCell(2).textContent = item.contract_method || '-';
+        row.insertCell(3).textContent = formatAmount(item.amount);
+        row.insertCell(4).textContent = item.region || '-';
+        row.insertCell(5).textContent = item.agency || '-';
+        const fileCell = row.insertCell(6);
+        if (item.file_name && item.file_url) {
+            const names = item.file_name.split('| '); const urls = item.file_url.split('| ');
+            let html = ''; names.forEach((name, idx) => { const url = urls[idx] || '#'; html += `<a href="${url}" target="_blank" title="${name}" style="color:#2563eb;text-decoration:none;margin-right:5px;">💾</a>`; });
+            fileCell.innerHTML = html;
+        } else { fileCell.textContent = '-'; }
+    }
+}
+
+function renderMainBidTable() {
+    const table = document.getElementById('mainBidTable'); if (!table) return;
+    while (table.rows.length > 1) table.deleteRow(1);
+    allData.slice(0, 4).forEach((item, i) => {
+        const row = table.insertRow(); row.style.cursor = 'pointer';
+        row.onclick = () => { showPage('bid'); setTimeout(() => showBidDetail(item.notice_number), 100); };
+        row.insertCell(0).textContent = i + 1;
+        row.insertCell(1).textContent = item.notice_title || '-';
+        row.insertCell(2).textContent = item.contract_method || '-';
+        row.insertCell(3).textContent = formatAmount(item.amount);
+        row.insertCell(4).textContent = item.region || '-';
+        row.insertCell(5).textContent = item.agency || '-';
+    });
+}
+
+function showBidDetail(notice_number) {
+    showPage('bidDetail');
+    const data = MOCK_DATA.find(d => d.notice_number === notice_number) || {};
+    document.getElementById('detailTitle').textContent = data.notice_title || '-';
+    document.getElementById('detailNtceNo').textContent = data.notice_number || '-';
+    document.getElementById('detailMethod').textContent = data.contract_method || '-';
+    document.getElementById('detailDminstt').textContent = data.agency || '-';
+    document.getElementById('detailDmndInstt').textContent = data.demand_agency || '-';
+    document.getElementById('detailAmount').textContent = formatAmount(data.amount);
+    document.getElementById('detailNtceDate').textContent = formatDate(data.bid_start);
+    document.getElementById('detailOpengDate').textContent = formatDate(data.bid_end);
+    document.getElementById('detailBizType').textContent = data.biz_type || '-';
+    document.getElementById('detailRegion').textContent = data.region || '-';
+    const fc = document.getElementById('detailFiles');
+    if (data.file_name) { fc.innerHTML = `<a href="#" style="color:#2563eb;">💾 ${data.file_name}</a>`; }
+    else { fc.textContent = '첨부파일 없음'; }
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
+    const div = document.getElementById('pagination');
+    let html = `<button onclick="fetchBidList(${currentPage-1})" ${currentPage===1?'disabled':''}>이전</button>`;
+    for (let i = 1; i <= totalPages; i++) {
+        if (i===1||i===totalPages||(i>=currentPage-2&&i<=currentPage+2)) html += `<button onclick="fetchBidList(${i})" class="${i===currentPage?'active':''}">${i}</button>`;
+        else if (i===currentPage-3||i===currentPage+3) html += `<button disabled>...</button>`;
+    }
+    html += `<button onclick="fetchBidList(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>다음</button>`;
+    div.innerHTML = html;
+}
+
+function updateBidStats() {
+    const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
+    const todayCount = allData.filter(b => String(b.bid_start||'').startsWith(today)).length;
+    let matchedCount = 0;
+    if (DB.currentUser) { const kws = DB.getUserKeywords(); matchedCount = allData.filter(b => kws.some(kw => (b.notice_title||'').includes(kw))).length; }
+    const amounts = allData.map(b => parseInt(b.amount||0)).filter(n => n > 0);
+    const avgAmount = amounts.length ? formatAmount(Math.round(amounts.reduce((a,b)=>a+b,0)/amounts.length)) : '-';
+    document.getElementById('totalBids').textContent = allData.length;
+    document.getElementById('todayBids').textContent = todayCount;
+    document.getElementById('matchedBids').textContent = matchedCount;
+    document.getElementById('avgAmount').textContent = avgAmount;
+}
+
+// ===== 검색/필터 (다중 키워드 지원) =====
+function searchBids() {
+    commitPendingSearchInput();
+    applySearchFilter();
+    currentPage = 1;
+    renderBidTable();
+    renderPagination();
+}
+function handleSearchEnter(e) { if (e.key === 'Enter') searchBids(); }
+function applyFilters() { searchBids(); }
+function clearFilters() {
+    ['regionFilter','methodFilter','agencyFilter'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('searchInput').value = '';
+    searchKeywords = [];
+    renderSearchChips();
+    applySearchFilter(); currentPage = 1; renderBidTable(); renderPagination();
+}
+
+function searchByKeyword(keyword) {
+    showPage('bid');
+    document.getElementById('searchInput').value = '';
+    searchKeywords = [keyword];
+    renderSearchChips();
+    searchBids();
+}
+
+function showPage(id, pushHistory = true) {
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id !== 'mypage') resetKeywordEditMode();
+    if (id === 'mypage') { resetKeywordEditMode(); loadMyPage(); }
+    if (id === 'bid') { if (!restoreBidState()) updateBidStats(); }
+    if (pushHistory) history.pushState({ page: id }, '', '#' + id);
+}
+window.addEventListener('popstate', (e) => { const id = e.state?.page || 'main'; showPage(id, false); });
+
+function goToNoticeDetail(notice_number) {
+    if (!notice_number) return;
+    const d = document.getElementById('notificationDropdown'); if (d) d.classList.remove('show');
+    showBidDetail(notice_number);
+}
+
+// 로그인/로그아웃
+function handleLogin() {
+    const id = document.getElementById('loginId').value.trim(), pw = document.getElementById('loginPassword').value;
+    if (!id||!pw) { showAlert('아이디와 비밀번호를 입력해주세요.'); return; }
+    const user = DB.findUser(id, pw);
+    if (user) {
+        resetKeywordEditMode(); DB.currentUser = user; showAlert('로그인 성공!');
+        document.getElementById('loginLink').style.display = 'none';
+        document.getElementById('logoutLink').style.display = 'inline';
+        document.getElementById('mypageLink').style.display = 'inline';
+        document.getElementById('notificationBell').classList.add('show');
+        showPage('main');
+        document.getElementById('mainKeywordPanel').classList.add('show');
+        loadUserKeywords(); updateNotificationBadge();
+        document.getElementById('loginId').value = ''; document.getElementById('loginPassword').value = '';
+    } else { showAlert('등록되지 않은 회원입니다.'); }
+}
+function handleLoginEnter(e) { if (e.key === 'Enter') handleLogin(); }
+function handleKeywordEnter(e, type) { if (e.key === 'Enter' && type === 'mypage') addMypageKeyword(); }
+function handleLogout() {
+    resetKeywordEditMode(); DB.currentUser = null;
+    document.getElementById('loginLink').style.display = 'inline';
+    document.getElementById('logoutLink').style.display = 'none';
+    document.getElementById('mypageLink').style.display = 'none';
+    document.getElementById('notificationBell').classList.remove('show');
+    document.getElementById('mainKeywordPanel').classList.remove('show');
+    showAlert('로그아웃되었습니다.'); showPage('main');
+}
+
+// 회원가입
+function openSignupModal() { document.getElementById('signupModal').classList.add('show'); }
+function closeSignupModal() {
+    document.getElementById('signupModal').classList.remove('show');
+    ['signupId','signupPassword','signupPasswordConfirm','signupEmail','signupPhone'].forEach(id => { document.getElementById(id).value = ''; });
+}
+function handleSignup() {
+    const id = document.getElementById('signupId').value.trim(), pw = document.getElementById('signupPassword').value;
+    const pwc = document.getElementById('signupPasswordConfirm').value, email = document.getElementById('signupEmail').value.trim();
+    const phone = document.getElementById('signupPhone').value.trim();
+    if (!id||!pw||!email||!phone) { showAlert('모든 항목을 입력해주세요.'); return; }
+    if (pw !== pwc) { showAlert('비밀번호가 일치하지 않습니다.'); return; }
+    if (DB.users.find(u => u.id === id)) { showAlert('이미 존재하는 아이디입니다.'); return; }
+    DB.addUser(id, pw, email, phone); showAlert('회원가입이 완료되었습니다.'); closeSignupModal();
+}
+
+// 키워드
+function loadUserKeywords() {
+    const kws = DB.getUserKeywords();
+    document.getElementById('keywordList').innerHTML = kws.length === 0
+        ? '<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'
+        : kws.map(kw => `<div class="keyword-item" onclick="searchByKeyword('${kw}')"><span class="keyword-item-text">${kw}</span></div>`).join('');
+    loadMypageKeywordList();
+}
+
+function loadMyPage() {
+    if (!DB.currentUser) return;
+    const u = DB.users.find(u => u.id === DB.currentUser.id);
+    if (u) {
+        document.getElementById('userIdDisplay').textContent = u.id;
+        document.getElementById('userEmailDisplay').textContent = u.email;
+        document.getElementById('userPhoneDisplay').textContent = u.phone;
+        loadUserKeywordsMypage(); loadNotifications();
+    }
+}
+
+let isEditMode = false, originalEmail = '', originalPhone = '';
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    const em = document.getElementById('userEmailDisplay'), pm = document.getElementById('userPhoneDisplay');
+    document.getElementById('editBtn').style.display = isEditMode ? 'none' : 'block';
+    document.getElementById('editButtons').style.display = isEditMode ? 'block' : 'none';
+    if (isEditMode) {
+        originalEmail = em.textContent; originalPhone = pm.textContent;
+        em.innerHTML = `<input type="email" id="editEmail" value="${originalEmail}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:inherit;">`;
+        pm.innerHTML = `<input type="tel" id="editPhone" value="${originalPhone}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:inherit;">`;
+    }
+}
+function cancelEdit() {
+    isEditMode = false;
+    document.getElementById('editBtn').style.display = 'block';
+    document.getElementById('editButtons').style.display = 'none';
+    document.getElementById('userEmailDisplay').textContent = originalEmail;
+    document.getElementById('userPhoneDisplay').textContent = originalPhone;
+}
+function saveUserInfo() {
+    const ne = document.getElementById('editEmail').value.trim(), np = document.getElementById('editPhone').value.trim();
+    if (!ne||!np) { showAlert('이메일과 전화번호를 모두 입력해주세요.'); return; }
+    if (DB.currentUser) { const u = DB.users.find(u => u.id === DB.currentUser.id); if (u) { u.email = ne; u.phone = np; DB.currentUser.email = ne; DB.currentUser.phone = np; DB.save(); } }
+    isEditMode = false;
+    document.getElementById('editBtn').style.display = 'block';
+    document.getElementById('editButtons').style.display = 'none';
+    document.getElementById('userEmailDisplay').textContent = ne;
+    document.getElementById('userPhoneDisplay').textContent = np;
+    showAlert('회원정보가 수정되었습니다.');
+}
+
+function loadUserKeywordsMypage() { loadMypageKeywordList(); }
+let isKeywordEditMode = false;
+function loadMypageKeywordList() {
+    const kws = DB.getUserKeywords(), kc = DB.getKeywordChecks();
+    const container = document.getElementById('mypageKeywordList');
+    if (kws.length === 0) { container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'; return; }
+    const sorted = [...kws].sort((a,b) => { const ac = kc[a]||false, bc = kc[b]||false; if(ac&&!bc)return -1; if(!ac&&bc)return 1; return a.localeCompare(b,'ko'); });
+    container.innerHTML = sorted.map(kw => `
+        <div class="keyword-item ${isKeywordEditMode?'edit-mode':''} ${kc[kw]?'checked':''}" onclick="event.stopPropagation()">
+            <input type="checkbox" class="keyword-item-checkbox" ${kc[kw]?'checked':''} onchange="toggleKeywordCheck('${kw}',this.checked)">
+            <span class="keyword-item-text">${kw}</span>
+            <button class="keyword-item-delete" onclick="deleteKeyword('${kw}')"><i class="fa-solid fa-trash-can"></i></button>
+        </div>`).join('');
+}
+function toggleKeywordCheck(kw, checked) { DB.setKeywordCheck(kw, checked); loadMypageKeywordList(); }
+function toggleKeywordEditMode() {
+    isKeywordEditMode = !isKeywordEditMode;
+    const eb = document.getElementById('keywordEditBtn'), bd = document.getElementById('keywordBulkDeleteBtn'), ab = document.getElementById('keywordAddBtn');
+    if (isKeywordEditMode) { eb.textContent = '확인'; eb.className = 'btn-confirm'; bd.style.display = 'block'; ab.classList.add('show'); }
+    else { eb.textContent = '수정'; eb.className = 'btn-edit'; bd.style.display = 'none'; ab.classList.remove('show'); }
+    loadMypageKeywordList();
+}
+function resetKeywordEditMode() {
+    isKeywordEditMode = false;
+    const eb = document.getElementById('keywordEditBtn'), bd = document.getElementById('keywordBulkDeleteBtn'), ab = document.getElementById('keywordAddBtn');
+    if(eb){eb.textContent='수정';eb.className='btn-edit';} if(bd)bd.style.display='none'; if(ab)ab.classList.remove('show');
+}
+function showKeywordInputBox() { document.getElementById('mypageKeywordInput').focus(); }
+
+function addMypageKeyword() {
+    const input = document.getElementById('mypageKeywordInput'), val = input.value.trim();
+    if (!val) return;
+    const cur = DB.getUserKeywords();
+    if (cur.includes(val)) { showAlert('이미 존재하는 키워드입니다.'); input.value = ''; return; }
+    cur.push(val); DB.updateUserKeywords(cur); input.value = ''; loadUserKeywords(); updateBidStats();
+}
+function deleteKeyword(kw) {
+    if (confirm('삭제하시겠습니까?')) { DB.updateUserKeywords(DB.getUserKeywords().filter(k => k !== kw)); loadUserKeywords(); updateBidStats(); }
+}
+function openBulkDeleteModal() {
+    const kws = DB.getUserKeywords(), c = document.getElementById('bulkDeleteList');
+    if (kws.length === 0) { showAlert('삭제할 키워드가 없습니다.'); return; }
+    c.innerHTML = kws.map((kw,i) => `<div class="bulk-delete-item"><input type="checkbox" id="bulk_${i}" value="${kw}"><label for="bulk_${i}">${kw}</label></div>`).join('');
+    document.getElementById('bulkDeleteModal').classList.add('show');
+}
+function closeBulkDeleteModal() { document.getElementById('bulkDeleteModal').classList.remove('show'); }
+let bulkDeleteCallback = null;
+function confirmBulkDelete() {
+    const cbs = document.querySelectorAll('#bulkDeleteList input[type="checkbox"]:checked');
+    if (cbs.length === 0) { showAlert('삭제할 키워드를 선택해주세요.'); return; }
+    const toDel = Array.from(cbs).map(cb => cb.value);
+    bulkDeleteCallback = () => { DB.updateUserKeywords(DB.getUserKeywords().filter(kw => !toDel.includes(kw))); loadUserKeywords(); updateBidStats(); toggleKeywordEditMode(); setTimeout(() => showAlert('선택한 키워드가 삭제되었습니다.'), 100); };
+    showConfirm('일괄 삭제하시겠습니까?');
+}
+function showConfirm(msg) { document.getElementById('confirmMessage').textContent = msg; document.getElementById('confirmModal').classList.add('show'); }
+function closeConfirm() { document.getElementById('confirmModal').classList.remove('show'); }
+function confirmAction() { if (bulkDeleteCallback) { const cb = bulkDeleteCallback; bulkDeleteCallback = null; closeConfirm(); closeBulkDeleteModal(); cb(); } else closeConfirm(); }
+
+// 알림
+function loadNotifications() { renderLocalNotifications(); }
+function renderLocalNotifications() {
+    const notis = DB.getNotifications();
+    const badge = document.getElementById('notificationBadge');
+    if (badge) { badge.textContent = notis.length; badge.style.display = notis.length === 0 ? 'none' : 'flex'; }
+    const dropdownContent = document.getElementById('notificationDropdownContent');
+    if (dropdownContent) {
+        if (notis.length === 0) { dropdownContent.innerHTML = '<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>'; }
+        else { dropdownContent.innerHTML = notis.slice(0,5).map((n,i) => `<div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}')"><strong style="color:#2563eb;">[${n.keyword}]</strong> ${n.notice_title || '새로운 공고'}<br><span style="font-size:11px;color:#9ca3af;">${n.date}</span></div>`).join(''); }
+    }
+    const mypageList = document.getElementById('notificationList');
+    if (mypageList) {
+        if (notis.length === 0) { mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>'; }
+        else { mypageList.innerHTML = notis.map((n,i) => `<div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;"><div><span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword}</span><strong>${n.notice_title || '공고 정보 없음'}</strong></div><span class="date">${n.date}</span><button class="delete-noti" onclick="event.stopPropagation();deleteNotification(${i})">×</button></div>`).join(''); }
+    }
+}
+function deleteNotification(index) {
+    if (DB.currentUser) { const u = DB.users.find(u => u.id === DB.currentUser.id); if (u) { u.notifications.splice(index, 1); DB.save(); renderLocalNotifications(); } }
+}
+function updateNotificationBadge() {
+    const n = DB.getNotifications(), badge = document.getElementById('notificationBadge');
+    if (badge) { badge.textContent = n.length; badge.style.display = n.length === 0 ? 'none' : 'flex'; }
+}
+function toggleNotificationDropdown() {
+    const d = document.getElementById('notificationDropdown'); d.classList.toggle('show');
+    if (d.classList.contains('show')) renderLocalNotifications();
+}
+document.addEventListener('click', e => {
+    const d = document.getElementById('notificationDropdown'), bell = document.getElementById('notificationBell');
+    if (d && bell && !bell.contains(e.target) && !d.contains(e.target)) d.classList.remove('show');
+});
+
+// ===== 마이페이지 탭 전환 =====
+function selectMypageTab(tab) {
+    // 사이드바 활성화
+    ['userinfo','keywords','notifications'].forEach(t => {
+        document.getElementById('sidebar-' + t).classList.toggle('active', t === tab);
+        document.getElementById('accordion-' + t).classList.toggle('active', t === tab);
+    });
+}
+
+// ===== 아코디언 토글 =====
+function toggleAccordion(tab) {
+    const body = document.getElementById('accordion-body-' + tab);
+    const header = body.previousElementSibling;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    header.classList.toggle('open', !isOpen);
+}
+
+// Alert
+function showAlert(msg) { document.getElementById('alertMessage').textContent = msg; document.getElementById('alertModal').classList.add('show'); setTimeout(() => document.getElementById('alertModal').focus(), 100); }
+function closeAlert() { document.getElementById('alertModal').classList.remove('show'); }
+document.addEventListener('keypress', e => { if (e.key === 'Enter' && document.getElementById('alertModal').classList.contains('show')) closeAlert(); });
+</script>
 </body>
 </html>
