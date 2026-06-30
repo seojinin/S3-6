@@ -30,8 +30,10 @@ header {
 }
 
 .logo {
-    font-size: 22px;
-    font-weight: 700;
+    height: 40px;      /* 헤더 높이(80px)에 맞춰 적당히 조절 */
+    width: auto;       /* 가로세로 비율 자동 유지 */
+    display: block;
+    object-fit: contain;
 }
 
 nav a {
@@ -427,6 +429,52 @@ section.active {
     padding: 14px;
     border-radius: 8px;
     border: 1px solid #ccc;
+}
+
+.search-input-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.search-input-col input {
+    flex: none;
+    width: 100%;
+}
+
+.search-chip-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 0;
+}
+
+.search-chip {
+    display: inline-flex;
+    align-items: center;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #2563eb;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    gap: 6px;
+}
+
+.search-chip button {
+    background: none;
+    border: none;
+    color: #93c5fd;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.search-chip button:hover {
+    color: #2563eb;
 }
 
 .search-bar button {
