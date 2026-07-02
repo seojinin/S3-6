@@ -6,23 +6,23 @@ import java.time.LocalDateTime;
 @Data
 public class NoticeModel {
 
-	private Long notice_id;
-	private String notice_number;
-	private String notice_title;
-	private String contract_method;
-	private Long amount;
-	private String region;
-	private String agency;
-	private String demand_agency;
+    private Long noticeId;
+    private String noticeNumber;
+    private String noticeTitle;
+    private String contractMethod;
+    private Long amount;
+    private String region;
+    private String agency;
+    private String demandAgency;
 
-	private LocalDateTime bid_start;
-	private LocalDateTime bid_end;
+    private LocalDateTime bidStart;
+    private LocalDateTime bidEnd;
 
-	private String raw_data;
-	private LocalDateTime created_at;
+    private String rawData;
+    private LocalDateTime createdAt;
 
-	private String entity_value;
-	private String file_name;
-	private String file_url;
+    private String entityValue;
+    private String fileName;
+    private String fileUrl;
 
 }

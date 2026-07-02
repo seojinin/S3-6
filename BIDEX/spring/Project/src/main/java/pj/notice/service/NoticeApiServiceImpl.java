@@ -56,9 +56,9 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 	private void saveNotice(JsonNode node) {
 		try {
 			NoticeModel notice = new NoticeModel();
-			notice.setNotice_number(node.path("bidNtceNo").asText());
-			notice.setNotice_title(node.path("bidNtceNm").asText());
-			notice.setContract_method(node.path("cntrctCnclsMthdNm").asText());
+			notice.setNoticeNumber(node.path("bidNtceNo").asText());
+			notice.setNoticeTitle(node.path("bidNtceNm").asText());
+			notice.setContractMethod(node.path("cntrctCnclsMthdNm").asText());
 
 			String amtStr = node.path("bdgtAmt").asText().trim();
 			Long amount = null;
@@ -72,7 +72,7 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 			notice.setAmount(amount);
 
 			notice.setAgency(node.path("ntceInsttNm").asText());
-			notice.setDemand_agency(node.path("dminsttNm").asText());
+			notice.setDemandAgency(node.path("dminsttNm").asText());
 			notice.setRegion(node.path("cnstrtsiteRgnNm").asText());
 
 			noticeMapper.insertNotice(notice);
