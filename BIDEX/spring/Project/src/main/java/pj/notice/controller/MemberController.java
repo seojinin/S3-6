@@ -22,7 +22,7 @@ public class MemberController {
             memberService.signup(member);
             return ResponseEntity.ok("회원가입 성공");
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("이미 존재하는 아이디입니다.");
+            return ResponseEntity.status(500).body("이미 존재하는 아이디입니다.");	
         }
     }
 

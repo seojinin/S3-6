@@ -537,20 +537,34 @@ function closeSignupModal() {
     ['signupId','signupPassword','signupPasswordConfirm','signupUsername','signupEmail','signupPhone'].forEach(id => { document.getElementById(id).value = ''; });
 }
 async function handleSignup() {
-    const id=document.getElementById('signupId').value.trim(), pw=document.getElementById('signupPassword').value;
-    const pwc=document.getElementById('signupPasswordConfirm').value;
-    const username=document.getElementById('signupUsername').value.trim();
-    const email=document.getElementById('signupEmail').value.trim();
-    const phone=document.getElementById('signupPhone').value.trim();
-    if (!id||!pw||!username||!email||!phone) { showAlert('모든 항목을 입력해주세요.'); return; }
-    if (pw!==pwc) { showAlert('비밀번호가 일치하지 않습니다.'); return; }
+    const id = document.getElementById('signupId').value.trim();
+    const pw = document.getElementById('signupPassword').value;
+    const pwc = document.getElementById('signupPasswordConfirm').value;
+    const username = document.getElementById('signupUsername').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const phone = document.getElementById('signupPhone').value.trim();
+
+    if (!id || !pw || !username || !email || !phone) {
+        showAlert('모든 항목을 입력해주세요.');
+        return;
+    }
+    if (pw !== pwc) {
+        showAlert('비밀번호가 일치하지 않습니다.');
+        return;
+    }
 
     try {
-        const res = await fetch('http://localhost:8080/api/member/signup', {
+        const res = await fetch('/api/member/signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ loginId: id, password: pw, username, email, phone })
+            body: JSON.stringify({
+                login_id: id,
+                password: pw,
+                username: username,
+                email: email,
+                phone: phone
+            })
         });
         if (!res.ok) {
             const msg = await res.text();
@@ -564,7 +578,6 @@ async function handleSignup() {
         showAlert('서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.');
     }
 }
-
 // ===== 로그인/로그아웃 (Spring Security 세션 기반) =====
 async function handleLogin() {
     const id=document.getElementById('loginId').value.trim(), pw=document.getElementById('loginPassword').value;

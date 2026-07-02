@@ -37,7 +37,7 @@
 	    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
 	    WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%') -- 제목 검색
 	       OR e.entity_value LIKE CONCAT('%', #{keyword}, '%') -- NER 키워드 검색
-	    ORDER BY n.created_at DESC
+
 	</select>
 
 	<!-- 다중 키워드 검색 -->
