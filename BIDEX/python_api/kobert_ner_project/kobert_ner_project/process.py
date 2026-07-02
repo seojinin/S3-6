@@ -7,7 +7,6 @@ import re
 import pandas as pd
 import pdfplumber
 import zipfile
-import subprocess
 import tempfile
 import opendataloader_pdf
 import fitz
