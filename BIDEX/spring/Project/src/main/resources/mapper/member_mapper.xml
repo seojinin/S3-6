@@ -5,58 +5,79 @@
 
 <mapper namespace="pj.notice.mapper.MemberMapper">
 
-    <insert id="insertMember">
+	<insert id="insertMember">
 
-        INSERT INTO tb_member
-        (
-            login_id,
-            password,
-            username,
-            email,
-            phone
-        )
+		INSERT INTO tb_member
+		(
+		login_id,
+		password,
+		username,
+		email,
+		phone
+		)
 
-        VALUES
-        (
-            #{loginId},
-            #{password},
-            #{username},
-            #{email},
-            #{phone}
-        )
+		VALUES
+		(
+		#{loginId},
+		#{password},
+		#{username},
+		#{email},
+		#{phone}
+		)
 
-    </insert>
+	</insert>
 
-    <select id="selectByLoginId"
-            resultType="pj.notice.model.MemberModel">
+	<select id="selectByLoginId"
+		resultType="pj.notice.model.MemberModel">
 
-        SELECT *
-        FROM tb_member
-        WHERE login_id = #{loginId}
+		SELECT *
+		FROM tb_member
+		WHERE login_id = #{loginId}
 
-    </select>
+	</select>
 
-    <select id="selectByMemberId"
-            resultType="pj.notice.model.MemberModel">
+	<select id="selectByMemberId"
+		resultType="pj.notice.model.MemberModel">
 
-        SELECT *
-        FROM tb_member
-        WHERE member_id = #{memberId}
+		SELECT *
+		FROM tb_member
+		WHERE member_id = #{memberId}
 
-    </select>
+	</select>
 
 	<update id="updateMember">
-	
-	    UPDATE tb_member
-	
-	    SET
-	
-	        username = #{username},
-	        email = #{email},
-	        phone = #{phone}
-	
-	    WHERE member_id = #{memberId}
-	
+
+		UPDATE tb_member
+
+		SET
+
+		username = #{username},
+		email = #{email},
+		phone = #{phone}
+
+		WHERE member_id = #{memberId}
+
 	</update>
+
+	<!-- 기존 관심 키워드 삭제 -->
+	<delete id="deleteMemberKeywords">
+		DELETE FROM tb_member_keyword
+		WHERE member_id = #{memberId}
+	</delete>
+
+	<!-- 회원 관심 키워드 등록 -->
+	<insert id="insertMemberKeyword">
+		INSERT INTO tb_member_keyword(member_id, keyword_id)
+		VALUES(#{memberId}, #{keywordId})
+	</insert>
+
+	<!-- 회원 관심 키워드 조회 -->
+	<select id="selectMemberKeywords" resultType="string">
+		SELECT k.standard_word
+		FROM tb_member_keyword mk
+		JOIN tb_keyword k
+		ON mk.keyword_id = k.keyword_id
+		WHERE mk.member_id = #{memberId}
+	</select>
 
 </mapper>

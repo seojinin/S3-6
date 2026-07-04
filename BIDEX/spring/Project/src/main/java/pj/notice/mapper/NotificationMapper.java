@@ -10,10 +10,12 @@ import pj.notice.model.NotificationModel;
 @Mapper
 public interface NotificationMapper {
 
-	void insertNotification(NotificationModel notification);
+    void insertNotification(NotificationModel notification);
 
-	List<NotificationModel> selectByMemberId(@Param("memberId") Long memberId);
+    List<NotificationModel> selectByMemberId(@Param("memberId") Long memberId);
 
-	void updateReadStatus(@Param("notificationId") Long notificationId);
+    void updateReadStatus(@Param("notificationId") Long notificationId, @Param("memberId") Long memberId);
+
+    int countUnread(@Param("memberId") Long memberId);
 
 }

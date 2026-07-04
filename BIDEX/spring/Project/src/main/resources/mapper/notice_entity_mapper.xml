@@ -10,7 +10,7 @@
     	(notice_number, entity_value, entity_type, file_name, file_url)
     	values
     	<foreach collection="list" item="item" separator=",">
-        	(#{item.notice_number}, #{item.entity_value}, #{item.entity_type}, #{item.file_name}, #{item.file_url})
+        	(#{item.noticeNumber}, #{item.entityValue}, #{item.entityType}, #{item.fileName}, #{item.fileUrl})
     	</foreach>
 	</insert>
 
@@ -49,7 +49,8 @@
 	        e.entity_type,
 	        e.file_name,
 	        n.notice_title,
-	        e.file_url
+	        e.file_url,
+	        n.created_at
 	
 	    FROM tb_notice n
 	    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
@@ -77,7 +78,7 @@
 	<!-- 공고-키워드 매핑 저장 -->
 	<insert id="insertNoticeKeywordMap">
 		INSERT IGNORE INTO tb_notice_keyword_map (notice_number, keyword_id, entity_type, file_name)
-		VALUES(#{notice_number}, #{keyword_id}, #{entity_type}, #{file_name})
+		VALUES(#{noticeNumber}, #{keywordId}, #{entityType}, #{fileName})
 	</insert>
 	
 	<!-- 키워드 ID로 해당 키워드를 등록한 회원 조회 -->

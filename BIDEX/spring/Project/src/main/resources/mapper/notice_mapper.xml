@@ -9,13 +9,13 @@
 	    insert ignore into tb_notice
 	    (notice_number, notice_title, contract_method, amount, agency, region, demand_agency)
 	    values
-	    (#{notice_number}, #{notice_title}, #{contract_method}, #{amount}, #{agency}, #{region}, #{demand_agency})
+	    (#{noticeNumber}, #{noticeTitle}, #{contractMethod}, #{amount}, #{agency}, #{region}, #{demandAgency})
 	</insert>
 
 	<select id="selectNoticeById" resultType="pj.notice.model.NoticeModel">
 		select *
 		from tb_notice
-		where notice_id = #{notice_id}
+		where notice_id = #{noticeId}
 	</select>
 
 	<!-- 키워드 검색도 가능하게 하려고 수정 -->

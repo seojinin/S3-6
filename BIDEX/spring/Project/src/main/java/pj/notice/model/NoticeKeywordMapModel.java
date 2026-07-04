@@ -5,9 +5,9 @@ import lombok.Data;
 @Data
 public class NoticeKeywordMapModel {
 
-	private String notice_number;
-	private Long keyword_id;
-	private String entity_type;
-	private String file_name;
+    private String noticeNumber;
+    private Long keywordId;
+    private String entityType;
+    private String fileName;
 
 }

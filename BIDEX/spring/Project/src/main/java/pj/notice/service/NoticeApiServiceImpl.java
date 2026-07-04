@@ -19,192 +19,208 @@ import pj.notice.dto.FileInfoDto;
 @Service
 public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
-	@Autowired
-	private NoticeMapper noticeMapper;
+    @Autowired
+    private NoticeMapper noticeMapper;
 
-	private RestTemplate restTemplate = new RestTemplate();
+    private RestTemplate restTemplate = new RestTemplate();
 
-	private String serviceKey = "b801f42df1eaeb53e32ca3e08185a477ce2e0a1988d6c5f841370e09d5717190";
+    private String serviceKey = "b801f42df1eaeb53e32ca3e08185a477ce2e0a1988d6c5f841370e09d5717190";
 
-	@Override
-	public void fetchNoticeFromApi() {
-		try {
-			String url = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
-					+ "?serviceKey=" + serviceKey + "&pageNo=1" + "&numOfRows=100" + "&inqryDiv=1"
-					+ "&inqryBgnDt=202601180000" + "&inqryEndDt=202601312359" + "&type=json";
+    @Override
+    public void fetchNoticeFromApi() {
 
-			String result = restTemplate.getForObject(url, String.class);
+	try {
+	    String url = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
+		    + "?serviceKey=" + serviceKey + "&pageNo=1" + "&numOfRows=100" + "&inqryDiv=1"
+		    + "&inqryBgnDt=202601180000" + "&inqryEndDt=202601312359" + "&type=json";
 
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode root = mapper.readTree(result);
+	    String result = restTemplate.getForObject(url, String.class);
 
-			JsonNode items = root.path("response").path("body").path("items");
+	    ObjectMapper mapper = new ObjectMapper();
+	    JsonNode root = mapper.readTree(result);
 
-			if (items.isArray()) {
-				for (JsonNode node : items) {
-					saveNotice(node);
-					List<FileInfoDto> files = extractFilesFromNotice(node);
-					sendFilesToPython(files);
-				}
-			}
+	    JsonNode items = root.path("response").path("body").path("items");
 
-		} catch (Exception e) {
-			e.printStackTrace();
+	    if (items.isArray()) {
+		for (JsonNode node : items) {
+		    saveNotice(node);
+		    List<FileInfoDto> files = extractFilesFromNotice(node);
+		    sendFilesToPython(files);
 		}
+	    }
+
+	} catch (Exception e) {
+	    e.printStackTrace();
 	}
+    }
 
-	private void saveNotice(JsonNode node) {
-		try {
-			NoticeModel notice = new NoticeModel();
-			notice.setNoticeNumber(node.path("bidNtceNo").asText());
-			notice.setNoticeTitle(node.path("bidNtceNm").asText());
-			notice.setContractMethod(node.path("cntrctCnclsMthdNm").asText());
+    private void saveNotice(JsonNode node) {
 
-			String amtStr = node.path("bdgtAmt").asText().trim();
-			Long amount = null;
+	try {
+	    NoticeModel notice = new NoticeModel();
+	    notice.setNoticeNumber(node.path("bidNtceNo").asText());
+	    notice.setNoticeTitle(node.path("bidNtceNm").asText());
+	    notice.setContractMethod(node.path("cntrctCnclsMthdNm").asText());
 
-			if (amtStr != null && !amtStr.isEmpty() && !amtStr.equals("-")) {
-				amtStr = amtStr.replaceAll("[^0-9]", "");
-				if (!amtStr.isEmpty()) {
-					amount = Long.parseLong(amtStr);
-				}
-			}
-			notice.setAmount(amount);
+	    String amtStr = node.path("bdgtAmt").asText().trim();
+	    Long amount = null;
 
-			notice.setAgency(node.path("ntceInsttNm").asText());
-			notice.setDemandAgency(node.path("dminsttNm").asText());
-			notice.setRegion(node.path("cnstrtsiteRgnNm").asText());
-
-			noticeMapper.insertNotice(notice);
-
-		} catch (Exception e) {
-			e.printStackTrace();
+	    if (amtStr != null && !amtStr.isEmpty() && !amtStr.equals("-")) {
+		amtStr = amtStr.replaceAll("[^0-9]", "");
+		if (!amtStr.isEmpty()) {
+		    amount = Long.parseLong(amtStr);
 		}
+	    }
+	    notice.setAmount(amount);
+
+	    notice.setAgency(node.path("ntceInsttNm").asText());
+	    notice.setDemandAgency(node.path("dminsttNm").asText());
+	    notice.setRegion(node.path("cnstrtsiteRgnNm").asText());
+
+	    noticeMapper.insertNotice(notice);
+
+	} catch (Exception e) {
+	    e.printStackTrace();
 	}
+    }
 
-	private List<FileInfoDto> extractFilesFromNotice(JsonNode node) {
-		List<FileInfoDto> files = new ArrayList<>();
-		String bidNtceNo = node.path("bidNtceNo").asText();
+    private List<FileInfoDto> extractFilesFromNotice(JsonNode node) {
 
-		for (int i = 1; i <= 10; i++) {
-			String fileName = node.path("ntceSpecFileNm" + i).asText();
-			String fileUrl = node.path("ntceSpecDocUrl" + i).asText();
+	List<FileInfoDto> files = new ArrayList<>();
+	String bidNtceNo = node.path("bidNtceNo").asText();
 
-			if (!fileName.isEmpty() && !fileUrl.isEmpty()) {
-				FileInfoDto file = new FileInfoDto();
-				file.setBidNtceNo(bidNtceNo);
-				file.setFileName(fileName);
-				file.setFileUrl(fileUrl);
-				files.add(file);
+	for (int i = 1; i <= 10; i++) {
+	    String fileName = node.path("ntceSpecFileNm" + i).asText();
+	    String fileUrl = node.path("ntceSpecDocUrl" + i).asText();
+
+	    if (!fileName.isEmpty() && !fileUrl.isEmpty()) {
+		FileInfoDto file = new FileInfoDto();
+		file.setBidNtceNo(bidNtceNo);
+		file.setFileName(fileName);
+		file.setFileUrl(fileUrl);
+		files.add(file);
+	    }
+	}
+	return files;
+    }
+
+    private void sendFilesToPython(List<FileInfoDto> files) {
+
+	try {
+	    if (files == null || files.isEmpty())
+		return;
+
+	    String pythonUrl = "http://localhost:8000/process";
+	    List<Map<String, String>> fileList = new ArrayList<>();
+
+	    for (FileInfoDto f : files) {
+		Map<String, String> fileMap = new HashMap<>();
+		fileMap.put("bidNtceNo", f.getBidNtceNo());
+		fileMap.put("fileName", f.getFileName());
+		fileMap.put("fileUrl", f.getFileUrl());
+		fileList.add(fileMap);
+	    }
+
+	    Map<String, Object> requestBody = new HashMap<>();
+	    requestBody.put("files", fileList);
+
+	    System.out.println("========== Python 전송 ==========");
+	    System.out.println("공고번호 : " + files.get(0).getBidNtceNo());
+	    System.out.println("전송 파일 수 : " + files.size());
+
+	    for (FileInfoDto f : files) {
+		System.out.println(" - " + f.getFileName());
+	    }
+
+	    String response = restTemplate.postForObject(pythonUrl, requestBody, String.class);
+
+	    System.out.println("Python 응답 : " + response);
+	    System.out.println("================================");
+
+	} catch (Exception e) {
+	    System.out.println("Python 서버 호출 실패");
+	    e.printStackTrace();
+	}
+    }
+
+    @Override
+    public List<NoticeModel> getAllNotices() {
+	return noticeMapper.selectAllNotices();
+    }
+
+    // 🔥 핵심 수정된 부분
+    public Map<String, Object> getNoticeDetailLive(String noticeNumber) {
+
+	Map<String, Object> result = new HashMap<>();
+
+	try {
+	    String url = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
+		    + "?serviceKey=" + serviceKey + "&pageNo=1" + "&numOfRows=100" + "&inqryDiv=1"
+		    + "&inqryBgnDt=202601180000" + "&inqryEndDt=202601312359" + "&type=json";
+
+	    String response = restTemplate.getForObject(url, String.class);
+
+	    ObjectMapper mapper = new ObjectMapper();
+	    JsonNode items = mapper.readTree(response).path("response").path("body").path("items");
+
+	    for (JsonNode node : items) {
+
+		if (noticeNumber.equals(node.path("bidNtceNo").asText())) {
+
+		    // ✅ 프론트 기준으로 key 맞춤
+		    result.put("notice_number", node.path("bidNtceNo").asText());
+		    result.put("notice_title", node.path("bidNtceNm").asText());
+		    result.put("contract_method", node.path("cntrctCnclsMthdNm").asText());
+		    result.put("agency", node.path("ntceInsttNm").asText());
+		    result.put("demand_agency", node.path("dminsttNm").asText());
+		    result.put("notice_date", node.path("bidNtceDt").asText());
+		    result.put("opening_date", node.path("opengDt").asText());
+
+		    // 금액 변환
+		    String amtStr = node.path("bdgtAmt").asText();
+		    Long amount = null;
+
+		    if (amtStr != null && !amtStr.isEmpty()) {
+			try {
+			    amtStr = amtStr.replaceAll("[^0-9]", "");
+			    if (!amtStr.isEmpty()) {
+				amount = Long.parseLong(amtStr);
+			    }
+			} catch (Exception e) {
+			    amount = null;
 			}
-		}
-		return files;
-	}
+		    }
 
-	private void sendFilesToPython(List<FileInfoDto> files) {
-		try {
-			if (files == null || files.isEmpty())
-				return;
+		    result.put("amount", amount);
 
-			String pythonUrl = "http://localhost:8000/process";
-			List<Map<String, String>> fileList = new ArrayList<>();
+		    result.put("bid_start", node.path("bidNtceDt").asText());
+		    result.put("bid_end", node.path("opengDt").asText());
+		    result.put("biz_type", node.path("rgstTyNm").asText());
+		    result.put("region", node.path("cnstrtsiteRgnNm").asText());
 
-			for (FileInfoDto f : files) {
-				Map<String, String> fileMap = new HashMap<>();
-				fileMap.put("bidNtceNo", f.getBidNtceNo());
-				fileMap.put("fileName", f.getFileName());
-				fileMap.put("fileUrl", f.getFileUrl());
-				fileList.add(fileMap);
+		    List<Map<String, String>> files = new ArrayList<>();
+		    for (int i = 1; i <= 10; i++) {
+			String name = node.path("ntceSpecFileNm" + i).asText();
+			String urlFile = node.path("ntceSpecDocUrl" + i).asText();
+
+			if (!name.isEmpty() && !urlFile.isEmpty()) {
+			    Map<String, String> f = new HashMap<>();
+			    f.put("fileName", name);
+			    f.put("fileUrl", urlFile);
+			    files.add(f);
 			}
+		    }
 
-			Map<String, Object> requestBody = new HashMap<>();
-			requestBody.put("files", fileList);
+		    result.put("files", files);
 
-			restTemplate.postForObject(pythonUrl, requestBody, String.class);
-
-		} catch (Exception e) {
-			e.printStackTrace();
+		    return result;
 		}
+	    }
+
+	} catch (Exception e) {
+	    e.printStackTrace();
 	}
 
-	@Override
-	public List<NoticeModel> getAllNotices() {
-		return noticeMapper.selectAllNotices();
-	}
-
-	// 🔥 핵심 수정된 부분
-	public Map<String, Object> getNoticeDetailLive(String noticeNumber) {
-
-		Map<String, Object> result = new HashMap<>();
-
-		try {
-			String url = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
-					+ "?serviceKey=" + serviceKey + "&pageNo=1" + "&numOfRows=100" + "&inqryDiv=1"
-					+ "&inqryBgnDt=202601180000" + "&inqryEndDt=202601312359" + "&type=json";
-
-			String response = restTemplate.getForObject(url, String.class);
-
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode items = mapper.readTree(response).path("response").path("body").path("items");
-
-			for (JsonNode node : items) {
-
-				if (noticeNumber.equals(node.path("bidNtceNo").asText())) {
-
-					// ✅ 프론트 기준으로 key 맞춤
-					result.put("notice_number", node.path("bidNtceNo").asText());
-					result.put("notice_title", node.path("bidNtceNm").asText());
-					result.put("contract_method", node.path("cntrctCnclsMthdNm").asText());
-					result.put("agency", node.path("ntceInsttNm").asText());
-					result.put("demand_agency", node.path("dminsttNm").asText());
-					result.put("notice_date", node.path("bidNtceDt").asText());
-					result.put("opening_date", node.path("opengDt").asText());
-
-					// 금액 변환
-					String amtStr = node.path("bdgtAmt").asText();
-					Long amount = null;
-
-					if (amtStr != null && !amtStr.isEmpty()) {
-						try {
-							amtStr = amtStr.replaceAll("[^0-9]", "");
-							if (!amtStr.isEmpty()) {
-								amount = Long.parseLong(amtStr);
-							}
-						} catch (Exception e) {
-							amount = null;
-						}
-					}
-
-					result.put("amount", amount);
-
-					result.put("bid_start", node.path("bidNtceDt").asText());
-					result.put("bid_end", node.path("opengDt").asText());
-					result.put("biz_type", node.path("rgstTyNm").asText());
-					result.put("region", node.path("cnstrtsiteRgnNm").asText());
-
-					List<Map<String, String>> files = new ArrayList<>();
-					for (int i = 1; i <= 10; i++) {
-						String name = node.path("ntceSpecFileNm" + i).asText();
-						String urlFile = node.path("ntceSpecDocUrl" + i).asText();
-
-						if (!name.isEmpty() && !urlFile.isEmpty()) {
-							Map<String, String> f = new HashMap<>();
-							f.put("fileName", name);
-							f.put("fileUrl", urlFile);
-							files.add(f);
-						}
-					}
-
-					result.put("files", files);
-
-					return result;
-				}
-			}
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return result;
-	}
+	return result;
+    }
 }

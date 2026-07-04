@@ -12,19 +12,19 @@ import pj.notice.model.MemberModel;
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
-	@Autowired
-	private MemberMapper memberMapper;
+    @Autowired
+    private MemberMapper memberMapper;
 
-	@Override
-	public UserDetails loadUserByUsername(String loginId) throws UsernameNotFoundException {
+    @Override
+    public UserDetails loadUserByUsername(String loginId) throws UsernameNotFoundException {
 
-		MemberModel member = memberMapper.selectByLoginId(loginId);
+	MemberModel member = memberMapper.selectByLoginId(loginId);
 
-		if (member == null) {
-			throw new UsernameNotFoundException(loginId);
-		}
-
-		return new CustomUserDetails(member);
+	if (member == null) {
+	    throw new UsernameNotFoundException(loginId);
 	}
+
+	return new CustomUserDetails(member);
+    }
 
 }

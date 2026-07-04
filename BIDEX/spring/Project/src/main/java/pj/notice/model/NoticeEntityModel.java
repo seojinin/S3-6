@@ -5,14 +5,15 @@ import lombok.Data;
 @Data
 public class NoticeEntityModel {
 
-    private Long entity_id;
+    private Long entityId;
 
-    private String notice_number;
-    private String notice_title;
+    private String noticeNumber;
+    private String noticeTitle;
 
-    private String entity_type;
-    private String entity_value;
+    private String entityType;
+    private String entityValue;
 
-    private String file_name;
-    private String file_url;
+    private String fileName;
+    private String fileUrl;
+
 }
