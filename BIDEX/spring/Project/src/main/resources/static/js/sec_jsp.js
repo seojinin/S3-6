@@ -9,22 +9,6 @@ const DB = {
         this.save();
     },
     findUser(id, password) { return this.users.find(u => u.id === id && u.password === password); },
-    updateUserKeywords(keywords) {
-        if (this.currentUser) {
-            const user = this.users.find(u => u.id === this.currentUser.id);
-            if (user) {
-                user.keywords = keywords;
-                const nc = {};
-                keywords.forEach(kw => { if (user.keywordChecks && user.keywordChecks[kw] !== undefined) nc[kw] = user.keywordChecks[kw]; });
-                user.keywordChecks = nc;
-                this.save();
-            }
-        }
-    },
-    getUserKeywords() {
-        if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? u.keywords : []; }
-        return [];
-    },
     getKeywordChecks() {
         if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? (u.keywordChecks || {}) : {}; }
         return {};
@@ -35,22 +19,9 @@ const DB = {
             if (u) { if (!u.keywordChecks) u.keywordChecks = {}; u.keywordChecks[keyword] = checked; this.save(); }
         }
     },
-    addNotification(message, keyword, notice_number, notice_title) {
-        if (this.currentUser) {
-            const u = this.users.find(u => u.id === this.currentUser.id);
-            if (u) {
-                const now = new Date();
-                const d = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                u.notifications.push({ message, keyword, date: d, notice_number, notice_title });
-                this.save();
-            }
-        }
-    },
-    getNotifications() {
-        if (this.currentUser) { const u = this.users.find(u => u.id === this.currentUser.id); return u ? u.notifications : []; }
-        return [];
-    }
 };
+// 알림(Notification)은 더 이상 localStorage에 저장하지 않고, 백엔드 /api/notifications API에서
+// 직접 조회/갱신합니다 (아래 "===== 알림 =====" 섹션 참고).
 
 // 백엔드 로그인 세션으로 받아온 현재 로그인 회원 정보 (member_id, login_id, username, email, phone, role)
 let currentMember = null;
@@ -77,17 +48,21 @@ function setLoggedInUI() {
     document.getElementById('notificationBell').classList.add('show');
     document.getElementById('mainKeywordPanel').classList.add('show');
     loadUserKeywords();
-    updateNotificationBadge();
+    updateUnreadBadge();
 }
 function setLoggedOutUI() {
     currentMember = null;
     DB.currentUser = null;
+    userKeywords = [];
+    const kl = document.getElementById('keywordList');
+    if (kl) kl.innerHTML = '';
     document.getElementById('loginLink').style.display = 'inline';
     document.getElementById('logoutLink').style.display = 'none';
     document.getElementById('mypageLink').style.display = 'none';
     document.getElementById('divider').style.display = 'none';
     document.getElementById('notificationBell').classList.remove('show');
     document.getElementById('mainKeywordPanel').classList.remove('show');
+    updateUnreadBadge();
 }
 
 // 새로고침해도 세션이 살아있으면 로그인 상태를 복원
@@ -96,14 +71,17 @@ async function checkLoginStatus() {
         const res = await fetch('http://localhost:8080/api/member/mypage', { credentials: 'include' });
         if (!res.ok) { setLoggedOutUI(); return; }
         currentMember = await res.json();
-        ensureLocalUserRecord(currentMember.loginId);
+        ensureLocalUserRecord(currentMember.login_id);
         setLoggedInUI();
     } catch (e) {
         setLoggedOutUI();
     }
 }
-function goToNoticeDetail(notice_number) {
+function goToNoticeDetail(notice_number, notificationId) {
     if (!notice_number) return;
+    if (notificationId) {
+        markNotificationRead(notificationId).then(() => updateUnreadBadge());
+    }
     const d = document.getElementById('notificationDropdown');
     if (d) d.classList.remove('show');
     showBidDetail(notice_number);
@@ -180,21 +158,12 @@ function restoreBidState() {
 
 // ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
-    clearAllNotificationsOnStart();
     history.replaceState({ page: 'main' }, '', '#main');
     fetchBidList();
     checkLoginStatus();
+    // 로그인 상태일 때만 서버에서 안읽은 알림 개수를 주기적으로 갱신
+    setInterval(updateUnreadBadge, 10000);
 });
-
-function clearAllNotificationsOnStart() {
-    DB.users.forEach(user => { user.notifications = []; });
-    if (DB.currentUser) {
-        const u = DB.users.find(u => u.id === DB.currentUser.id);
-        if (u) u.notifications = [];
-    }
-    DB.save();
-    updateNotificationBadge();
-}
 
 // ===== 목록 호출 =====
 async function fetchBidList(page = 1) {
@@ -211,7 +180,6 @@ async function fetchBidList(page = 1) {
         renderMainBidTable();
         renderPagination();
         updateBidStats();
-        checkNewBidsForKeywords();
     } catch (e) {
         console.error('API 오류:', e);
         showTableError('bidTable', 7, 'API 호출에 실패했습니다. 서버 상태를 확인하세요.');
@@ -375,8 +343,8 @@ function updateBidStats() {
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
     const todayCount = allData.filter(b => String(b.bid_start||'').startsWith(today)).length;
     let matchedCount = 0;
-    if (DB.currentUser) {
-        const kws = DB.getUserKeywords();
+    if (currentMember) {
+        const kws = userKeywords;
         matchedCount = allData.filter(b => kws.some(kw => (b.notice_title||'').includes(kw))).length;
     }
     const amounts   = allData.map(b => parseInt(b.amount||0)).filter(n => n > 0);
@@ -511,25 +479,6 @@ function showTableError(tableId, cols, msg) {
     cell.colSpan = cols; cell.style.cssText = 'text-align:center;padding:40px;color:#ef4444;'; cell.textContent = msg;
 }
 
-// ===== 키워드 알림 체크 =====
-function checkNewBidsForKeywords() {
-    if (!DB.currentUser) return;
-    const kws   = DB.getUserKeywords();
-    const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
-    allData.forEach(item => {
-        if (String(item.bid_start || '').startsWith(today)) {
-            kws.forEach(kw => {
-                const titleMatch   = (item.notice_title || '').includes(kw);
-                const keywordMatch = (item.entity_value || '').includes(kw);
-                if (titleMatch || keywordMatch) {
-                    DB.addNotification('새 입찰공고', kw, item.notice_number, item.notice_title);
-                }
-            });
-        }
-    });
-    updateNotificationBadge();
-}
-
 // ===== 회원가입 =====
 function openSignupModal()  { document.getElementById('signupModal').classList.add('show'); }
 function closeSignupModal() {
@@ -603,7 +552,7 @@ async function handleLogin() {
         currentMember = await meRes.json();
 
         resetKeywordEditMode();
-        ensureLocalUserRecord(currentMember.loginId);
+        ensureLocalUserRecord(currentMember.login_id);
         showAlert('로그인 성공!');
         showPage('main');
         setLoggedInUI();
@@ -626,9 +575,44 @@ async function handleLogout() {
     showAlert('로그아웃되었습니다.'); showPage('main');
 }
 
-// ===== 키워드 =====
-function loadUserKeywords() {
-    const kws=DB.getUserKeywords();
+// ===== 키워드 (백엔드 /api/member/keywords 연동) =====
+let userKeywords = [];
+
+// 서버에서 로그인한 회원의 관심 키워드 목록을 가져옴
+async function fetchUserKeywords() {
+    if (!currentMember) { userKeywords = []; return userKeywords; }
+    try {
+        const res = await fetch('http://localhost:8080/api/member/keywords', { credentials: 'include' });
+        if (!res.ok) { userKeywords = []; return userKeywords; }
+        userKeywords = await res.json();
+    } catch (e) {
+        console.error('키워드 조회 API 호출 실패:', e);
+        userKeywords = [];
+    }
+    return userKeywords;
+}
+
+// 키워드 전체 목록을 서버에 저장 (덮어쓰기 방식)
+async function saveUserKeywordsToServer(keywords) {
+    try {
+        const res = await fetch('http://localhost:8080/api/member/keywords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(keywords)
+        });
+        if (!res.ok) { showAlert('키워드 저장에 실패했습니다.'); return false; }
+        return true;
+    } catch (e) {
+        console.error('키워드 저장 API 호출 실패:', e);
+        showAlert('서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.');
+        return false;
+    }
+}
+
+async function loadUserKeywords() {
+    await fetchUserKeywords();
+    const kws = userKeywords;
     document.getElementById('keywordList').innerHTML = kws.length===0
         ? '<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'
         : kws.map(kw=>`<div class="keyword-item" onclick="searchByKeyword('${kw}')"><span class="keyword-item-text">${kw}</span></div>`).join('');
@@ -639,9 +623,9 @@ async function loadMyPage() {
         const res = await fetch('http://localhost:8080/api/member/mypage', { credentials: 'include' });
         if (!res.ok) { showAlert('회원 정보를 불러올 수 없습니다. 다시 로그인해주세요.'); showPage('login'); return; }
         currentMember = await res.json();
-        ensureLocalUserRecord(currentMember.loginId);
+        ensureLocalUserRecord(currentMember.login_id);
 
-        document.getElementById('userIdDisplay').textContent = currentMember.loginId;
+        document.getElementById('userIdDisplay').textContent = currentMember.login_id;
         document.getElementById('userUsernameDisplay').textContent = currentMember.username || '-';
         document.getElementById('userEmailDisplay').textContent = currentMember.email || '-';
         document.getElementById('userPhoneDisplay').textContent = currentMember.phone || '-';
@@ -699,10 +683,10 @@ async function saveUserInfo() {
         showAlert('서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.');
     }
 }
-function loadUserKeywordsMypage() { loadMypageKeywordList(); }
+async function loadUserKeywordsMypage() { await fetchUserKeywords(); loadMypageKeywordList(); }
 let isKeywordEditMode=false;
 function loadMypageKeywordList() {
-    const kws=DB.getUserKeywords(), kc=DB.getKeywordChecks();
+    const kws=userKeywords, kc=DB.getKeywordChecks();
     const container=document.getElementById('mypageKeywordList');
     if (kws.length===0) { container.innerHTML='<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'; return; }
     const sorted=[...kws].sort((a,b)=>{ const ac=kc[a]||false,bc=kc[b]||false; if(ac&&!bc)return -1; if(!ac&&bc)return 1; return a.localeCompare(b,'ko'); });
@@ -766,14 +750,13 @@ function clearPopupTag() {
 
 function handlePopupEnter(e) { if (e.key === 'Enter') confirmKeywordPopup(); }
 
-function confirmKeywordPopup() {
+async function confirmKeywordPopup() {
     const kw = popupKeyword || document.getElementById('keywordPopupInput').value.trim();
     if (!kw) return;
-    const cur = DB.getUserKeywords();
-    if (cur.includes(kw)) { showAlert('이미 존재하는 키워드입니다.'); return; }
-    cur.push(kw);
-    DB.updateUserKeywords(cur);
-    loadUserKeywords();
+    if (userKeywords.includes(kw)) { showAlert('이미 존재하는 키워드입니다.'); return; }
+    const ok = await saveUserKeywordsToServer([...userKeywords, kw]);
+    if (!ok) return;
+    await loadUserKeywords();
     updateBidStats();
     closeKeywordPopup();
     showAlert(`'${kw}' 키워드가 등록되었습니다.`);
@@ -787,55 +770,61 @@ document.addEventListener('click', e => {
     }
 });
 
-function deleteKeyword(kw) {
-    if (confirm('삭제하시겠습니까?')) { DB.updateUserKeywords(DB.getUserKeywords().filter(k=>k!==kw)); loadUserKeywords(); updateBidStats(); }
+async function deleteKeyword(kw) {
+    if (!confirm('삭제하시겠습니까?')) return;
+    const ok = await saveUserKeywordsToServer(userKeywords.filter(k=>k!==kw));
+    if (!ok) return;
+    await loadUserKeywords();
+    updateBidStats();
 }
 
-// ===== 알림 =====
+// ===== 알림 (백엔드 /api/notifications 연동) =====
 function loadNotifications() { fetchNotificationsFromDB(); }
 function loadNotificationDropdown() { fetchNotificationsFromDB(); }
 
+// 알림 목록 전체 조회 (드롭다운을 열거나 마이페이지 진입 시에만 호출)
 async function fetchNotificationsFromDB() {
-    if (!currentMember) { renderLocalNotifications(); return; }
-    const memberId = currentMember.member_id;
+    if (!currentMember) { renderNotifications([]); return; }
     try {
-        const res = await fetch(`http://localhost:8080/api/notifications/${memberId}`, { credentials: 'include' });
-        if (res.ok) {
-            const notis = await res.json();
-            renderNotifications(notis);
+        const res = await fetch('http://localhost:8080/api/notifications', { credentials: 'include' });
+        if (!res.ok) {
+            if (res.status === 401) renderNotifications([]);
+            return;
         }
-    } catch(e) {
-        renderLocalNotifications();
+        const notis = await res.json();
+        renderNotifications(notis);
+    } catch (e) {
+        console.error('알림 조회 API 호출 실패:', e);
     }
 }
 
-function renderLocalNotifications() {
-    const notis = DB.getNotifications();
+// 안읽은 알림 개수만 가볍게 조회 (뱃지 폴링용)
+async function updateUnreadBadge() {
     const badge = document.getElementById('notificationBadge');
-    if (badge) { badge.textContent = notis.length; badge.style.display = notis.length === 0 ? 'none' : 'flex'; }
-
-    const dropdownContent = document.getElementById('notificationDropdownContent');
-    if (dropdownContent) {
-        if (notis.length === 0) { dropdownContent.innerHTML = '<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>'; return; }
-        dropdownContent.innerHTML = notis.slice(0,5).map((n,i) => `
-            <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;">
-                <strong style="color:#2563eb;">[${n.keyword}]</strong> ${n.notice_title || '새로운 공고'}<br>
-                <span style="font-size:11px;color:#9ca3af;">${n.date}</span>
-            </div>`).join('');
+    if (!currentMember) {
+        if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
+        return;
     }
+    try {
+        const res = await fetch('http://localhost:8080/api/notifications/unread-count', { credentials: 'include' });
+        if (!res.ok) return;
+        const count = await res.json();
+        if (badge) { badge.textContent = count; badge.style.display = count === 0 ? 'none' : 'flex'; }
+    } catch (e) {
+        console.error('안읽은 알림 개수 조회 실패:', e);
+    }
+}
 
-    const mypageList = document.getElementById('notificationList');
-    if (mypageList) {
-        if (notis.length === 0) { mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>'; return; }
-        mypageList.innerHTML = notis.map((n,i) => `
-            <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding-left:15px;">
-                <div>
-                    <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword}</span>
-                    <strong>${n.notice_title || '공고 정보 없음'}</strong>
-                </div>
-                <span class="date" style="font-size:12px;color:#6b7280;">${n.date}</span>
-                <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${i})" title="삭제">×</button>
-            </div>`).join('');
+// 알림 읽음 처리 (서버에 PUT 요청)
+async function markNotificationRead(notificationId) {
+    if (!notificationId) return;
+    try {
+        await fetch(`http://localhost:8080/api/notifications/${notificationId}/read`, {
+            method: 'PUT',
+            credentials: 'include'
+        });
+    } catch (e) {
+        console.error('알림 읽음 처리 실패:', e);
     }
 }
 
@@ -846,34 +835,40 @@ function renderNotifications(notis) {
 
     const dropdownContent = document.getElementById('notificationDropdownContent');
     if (dropdownContent) {
-        dropdownContent.innerHTML = notis.slice(0,5).map(n => `
-            <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;">
-                <strong style="color:#2563eb;">[${n.keyword || '알림'}]</strong> ${n.notice_title || '새로운 공고가 등록되었습니다.'}<br>
-                <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}</span>
-            </div>`).join('');
+        if (notis.length === 0) {
+            dropdownContent.innerHTML = '<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>';
+        } else {
+            dropdownContent.innerHTML = notis.slice(0,5).map(n => `
+                <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})" style="cursor:pointer;${n.is_read ? 'opacity:0.6;' : ''}">
+                    <strong style="color:#2563eb;">[${n.keyword || '알림'}]</strong> ${n.notice_title || '새로운 공고가 등록되었습니다.'}<br>
+                    <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}</span>
+                </div>`).join('');
+        }
     }
 
     const mypageList = document.getElementById('notificationList');
     if (mypageList) {
-        mypageList.innerHTML = notis.map(n => `
-            <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}')" style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding-left:15px;">
-                <div>
-                    <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
-                    <strong>${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
-                </div>
-                <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
-                <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="삭제">×</button>
-            </div>`).join('');
+        if (notis.length === 0) {
+            mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
+        } else {
+            mypageList.innerHTML = notis.map(n => `
+                <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})" style="cursor:pointer;margin-bottom:10px;border-left:4px solid ${n.is_read ? '#d1d5db' : '#2563eb'};padding-left:15px;${n.is_read ? 'opacity:0.6;' : ''}">
+                    <div>
+                        <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
+                        <strong>${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                    </div>
+                    <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
+                    <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="읽음 처리">×</button>
+                </div>`).join('');
+        }
     }
 }
 
-function deleteNotification(index) {
-    if (DB.currentUser) { const u=DB.users.find(u=>u.id===DB.currentUser.id); if (u) { u.notifications.splice(index,1); DB.save(); renderLocalNotifications(); } }
-}
-
-function updateNotificationBadge() {
-    const n=DB.getNotifications(), badge=document.getElementById('notificationBadge');
-    if (badge) { badge.textContent=n.length; badge.style.display=n.length===0?'none':'flex'; }
+// 백엔드에 알림 삭제 API가 없어, 읽음 처리 후 목록을 새로고침하는 방식으로 동작
+async function deleteNotification(notificationId) {
+    await markNotificationRead(notificationId);
+    await fetchNotificationsFromDB();
+    updateUnreadBadge();
 }
 
 function toggleNotificationDropdown() {
@@ -886,17 +881,18 @@ document.addEventListener('click', e => {
     if (d && bell && !bell.contains(e.target)&&!d.contains(e.target)) d.classList.remove('show');
 });
 
-setInterval(fetchNotificationsFromDB, 10000);
-
-function addMypageKeyword() {
+async function addMypageKeyword() {
     const input=document.getElementById('mypageKeywordInput'), val=input.value.trim();
     if (!val) return;
-    const cur=DB.getUserKeywords();
-    if (cur.includes(val)) { showAlert('이미 존재하는 키워드입니다.'); input.value=''; return; }
-    cur.push(val); DB.updateUserKeywords(cur); input.value=''; loadUserKeywords(); updateBidStats();
+    if (userKeywords.includes(val)) { showAlert('이미 존재하는 키워드입니다.'); input.value=''; return; }
+    const ok = await saveUserKeywordsToServer([...userKeywords, val]);
+    input.value='';
+    if (!ok) return;
+    await loadUserKeywords();
+    updateBidStats();
 }
 function openBulkDeleteModal() {
-    const kws=DB.getUserKeywords(), c=document.getElementById('bulkDeleteList');
+    const kws=userKeywords, c=document.getElementById('bulkDeleteList');
     if (kws.length===0) { showAlert('삭제할 키워드가 없습니다.'); return; }
     c.innerHTML=kws.map((kw,i)=>`<div class="bulk-delete-item"><input type="checkbox" id="bulk_${i}" value="${kw}"><label for="bulk_${i}">${kw}</label></div>`).join('');
     document.getElementById('bulkDeleteModal').classList.add('show');
@@ -907,7 +903,12 @@ function confirmBulkDelete() {
     const cbs=document.querySelectorAll('#bulkDeleteList input[type="checkbox"]:checked');
     if (cbs.length===0) { showAlert('삭제할 키워드를 선택해주세요.'); return; }
     const toDel=Array.from(cbs).map(cb=>cb.value);
-    bulkDeleteCallback=()=>{ DB.updateUserKeywords(DB.getUserKeywords().filter(kw=>!toDel.includes(kw))); loadUserKeywords(); updateBidStats(); toggleKeywordEditMode(); setTimeout(()=>showAlert('선택한 키워드가 삭제되었습니다.'),100); };
+    bulkDeleteCallback=async ()=>{
+        const ok = await saveUserKeywordsToServer(userKeywords.filter(kw=>!toDel.includes(kw)));
+        if (ok) { await loadUserKeywords(); updateBidStats(); }
+        toggleKeywordEditMode();
+        setTimeout(()=>showAlert('선택한 키워드가 삭제되었습니다.'),100);
+    };
     showConfirm('일괄 삭제하시겠습니까?');
 }
 function showConfirm(msg)  { document.getElementById('confirmMessage').textContent=msg; document.getElementById('confirmModal').classList.add('show'); }

@@ -27,7 +27,7 @@
 	<select id="searchByKeyword" resultType="pj.notice.model.NoticeEntityModel">
 	    SELECT DISTINCT 
 	        e.entity_id, 
-	        e.notice_number, 
+	        n.notice_number, 
 	        e.entity_value, 
 	        e.entity_type, 
 	        e.file_name, 
@@ -44,7 +44,7 @@
 	<select id="searchByKeywords" resultType="pj.notice.model.NoticeEntityModel">
 	    SELECT DISTINCT
 	        e.entity_id,
-	        e.notice_number,
+	        n.notice_number,
 	        e.entity_value,
 	        e.entity_type,
 	        e.file_name,
