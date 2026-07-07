@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import pj.notice.mapper.NoticeEntityMapper;
 import pj.notice.mapper.NoticeMapper;
 import pj.notice.model.NoticeModel;
 import pj.notice.dto.FileInfoDto;
@@ -21,6 +22,12 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
     @Autowired
     private NoticeMapper noticeMapper;
+
+    @Autowired
+    private NoticeEntityMapper noticeEntityMapper;
+
+    @Autowired
+    private NotificationIF notificationIF;
 
     private RestTemplate restTemplate = new RestTemplate();
 
@@ -78,6 +85,42 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 	    notice.setRegion(node.path("cnstrtsiteRgnNm").asText());
 
 	    noticeMapper.insertNotice(notice);
+
+	    // 🔔 신규 공고 제목과 회원들이 등록한 키워드를 실시간으로 비교해서 알림 생성
+	    checkKeywordMatchAndNotify(notice);
+
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
+    }
+
+    // 신규 공고 제목에 등록된 키워드가 포함되어 있으면, 그 키워드를 등록한 회원에게 알림 생성
+    private void checkKeywordMatchAndNotify(NoticeModel notice) {
+
+	try {
+	    String title = notice.getNoticeTitle();
+	    if (title == null || title.isEmpty()) {
+		return;
+	    }
+
+	    List<Map<String, Object>> keywords = noticeEntityMapper.selectAllKeywords();
+
+	    for (Map<String, Object> row : keywords) {
+
+		Object idObj = row.get("keyword_id");
+		Object wordObj = row.get("standard_word");
+
+		if (idObj == null || wordObj == null) {
+		    continue;
+		}
+
+		Long keywordId = ((Number) idObj).longValue();
+		String word = wordObj.toString();
+
+		if (!word.isEmpty() && title.contains(word)) {
+		    notificationIF.createKeywordNotifications(keywordId, word, notice.getNoticeNumber());
+		}
+	    }
 
 	} catch (Exception e) {
 	    e.printStackTrace();

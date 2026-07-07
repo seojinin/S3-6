@@ -1,6 +1,7 @@
 package pj.notice.mapper;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -31,5 +32,8 @@ public interface NoticeEntityMapper {
 
 	// 특정 키워드를 관심 키워드로 등록한 회원 ID 리스트 조회 (알림 발송용)
 	List<Long> selectMembersByKeywordId(@Param("keywordId") Long keywordId);
+
+	// 신규 공고 제목과 실시간으로 매칭할 전체 등록 키워드 목록 (keyword_id, standard_word)
+	List<Map<String, Object>> selectAllKeywords();
 
 }

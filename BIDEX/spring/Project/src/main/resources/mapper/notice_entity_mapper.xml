@@ -86,4 +86,10 @@
 	    SELECT member_id FROM tb_member_keyword WHERE keyword_id = #{keywordId}
 	</select>
 
+	<!-- 신규 공고 저장 시, 제목과 실시간으로 매칭할 전체 등록 키워드 목록 -->
+	<select id="selectAllKeywords" resultType="map">
+	    SELECT keyword_id AS keyword_id, standard_word AS standard_word
+	    FROM tb_keyword
+	</select>
+
 </mapper>
