@@ -27,20 +27,16 @@
 
 	</insert>
 
-	<select id="selectByLoginId"
-		resultType="pj.notice.model.MemberModel">
+	<select id="selectByLoginId" resultType="pj.notice.model.MemberModel">
 
-		SELECT *
-		FROM tb_member
+		SELECT * FROM tb_member
 		WHERE login_id = #{loginId}
 
 	</select>
 
-	<select id="selectByMemberId"
-		resultType="pj.notice.model.MemberModel">
+	<select id="selectByMemberId" resultType="pj.notice.model.MemberModel">
 
-		SELECT *
-		FROM tb_member
+		SELECT * FROM tb_member
 		WHERE member_id = #{memberId}
 
 	</select>
@@ -75,8 +71,7 @@
 	<select id="selectMemberKeywords" resultType="string">
 		SELECT k.standard_word
 		FROM tb_member_keyword mk
-		JOIN tb_keyword k
-		ON mk.keyword_id = k.keyword_id
+		JOIN tb_keyword k ON mk.keyword_id = k.keyword_id
 		WHERE mk.member_id = #{memberId}
 	</select>
 

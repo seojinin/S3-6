@@ -21,46 +21,44 @@ import pj.notice.service.NoticeEntityServiceIF;
 @RequestMapping("/api/notices")
 public class NoticeEntityController {
 
-	@Autowired
-	private NoticeEntityServiceIF service;
+    @Autowired
+    private NoticeEntityServiceIF service;
 
-	// NER 결과 저장 (Python 호출)
-	@PostMapping("/{noticeNumber}/entities")
-	public String saveEntities(@PathVariable String noticeNumber,
-	                           @RequestBody NoticeEntityBulkRequest request) {
+    // NER 결과 저장 (Python 호출)
+    @PostMapping("/{noticeNumber}/entities")
+    public String saveEntities(@PathVariable String noticeNumber, @RequestBody NoticeEntityBulkRequest request) {
 
-	    for (NoticeEntityDto dto : request.getEntities()) {
-	        dto.setNoticeNumber(noticeNumber);
-	    }
-
-	    service.saveBulk(request);
-
-	    return "saved";
+	for (NoticeEntityDto dto : request.getEntities()) {
+	    dto.setNoticeNumber(noticeNumber);
 	}
 
-	// 특정 공고의 엔티티 조회
-	@GetMapping("/{noticeNumber}/entities")
-	public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber) {
+	service.saveBulk(request);
 
-	    return service.getEntitiesByNoticeNumber(noticeNumber);
-	}
+	return "saved";
+    }
+
+    // 특정 공고의 엔티티 조회
+    @GetMapping("/{noticeNumber}/entities")
+    public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber) {
+
+	return service.getEntitiesByNoticeNumber(noticeNumber);
+    }
 
 //	@GetMapping("/entities/search")
 //	public List<NoticeEntityModel> search(@RequestParam String keyword) {
 //		return service.searchByKeyword(keyword);
 //	}
 
-	@GetMapping("/entities/search")
-	public List<NoticeEntityModel> search(
-	        @RequestParam String keyword) {
+    @GetMapping("/entities/search")
+    public List<NoticeEntityModel> search(@RequestParam String keyword) {
 
-	    List<String> keywords =
-	            Arrays.stream(keyword.split("/"))
-	                  .map(String::trim)
-	                  .filter(s -> !s.isEmpty())
-	                  .toList();
+	List<String> keywords = Arrays
+		.stream(keyword.split("/"))
+		.map(String::trim)
+		.filter(s -> !s.isEmpty())
+		.toList();
 
-	    return service.searchByKeywords(keywords);
-	}
+	return service.searchByKeywords(keywords);
+    }
 
 }

@@ -6,90 +6,96 @@
 <mapper namespace="pj.notice.mapper.NoticeEntityMapper">
 
 	<insert id="insertEntities">
-    	insert ignore into tb_notice_entity
-    	(notice_number, entity_value, entity_type, file_name, file_url)
-    	values
-    	<foreach collection="list" item="item" separator=",">
-        	(#{item.noticeNumber}, #{item.entityValue}, #{item.entityType}, #{item.fileName}, #{item.fileUrl})
-    	</foreach>
+		insert ignore into tb_notice_entity
+		(notice_number, entity_value, entity_type, file_name, file_url)
+		values
+		<foreach collection="list" item="item" separator=",">
+			(#{item.noticeNumber}, #{item.entityValue}, #{item.entityType},	#{item.fileName}, #{item.fileUrl})
+		</foreach>
 	</insert>
 
 	<!-- 공고 ID로 조회 -->
 	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
-	    SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type, e.file_name, n.notice_title, e.file_url
-	    FROM tb_notice_entity e
-	    JOIN tb_notice n ON e.notice_number = n.notice_number
-	    WHERE e.notice_number = #{noticeNumber}
+		SELECT e.entity_id, e.notice_number, e.entity_value, e.entity_type,	e.file_name, n.notice_title, e.file_url
+		FROM tb_notice_entity e
+		JOIN tb_notice n ON e.notice_number = n.notice_number
+		WHERE e.notice_number = #{noticeNumber}
 	</select>
 
 	<!-- 키워드 검색 -->
 	<!-- 공고명(제목) 또는 NER 엔티티 값으로 통합 검색 -->
 	<select id="searchByKeyword" resultType="pj.notice.model.NoticeEntityModel">
-	    SELECT DISTINCT 
-	        e.entity_id, 
-	        n.notice_number, 
-	        e.entity_value, 
-	        e.entity_type, 
-	        e.file_name, 
-	        n.notice_title, 
-	        e.file_url
-	    FROM tb_notice n
-	    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
-	    WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%') -- 제목 검색
-	       OR e.entity_value LIKE CONCAT('%', #{keyword}, '%') -- NER 키워드 검색
+		SELECT DISTINCT
+			e.entity_id,
+			n.notice_number,
+			e.entity_value,
+			e.entity_type,
+			e.file_name,
+			n.notice_title,
+			e.file_url
+		FROM tb_notice n
+		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+		WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%') -- 제목 검색
+		OR e.entity_value LIKE CONCAT('%', #{keyword}, '%') -- NER 키워드 검색
 
 	</select>
 
 	<!-- 다중 키워드 검색 -->
-	<select id="searchByKeywords" resultType="pj.notice.model.NoticeEntityModel">
-	    SELECT DISTINCT
-	        e.entity_id,
-	        n.notice_number,
-	        e.entity_value,
-	        e.entity_type,
-	        e.file_name,
-	        n.notice_title,
-	        e.file_url,
-	        n.created_at
-	
-	    FROM tb_notice n
-	    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
-	
-	    WHERE
-	    <foreach collection="keywords" item="keyword" separator=" OR ">
-	        n.notice_title LIKE CONCAT('%', #{keyword}, '%')
-	        OR e.entity_value LIKE CONCAT('%', #{keyword}, '%')
-	    </foreach>
-	    ORDER BY n.created_at DESC
+	<select id="searchByKeywords"
+		resultType="pj.notice.model.NoticeEntityModel">
+		SELECT DISTINCT
+			e.entity_id,
+			n.notice_number,
+			e.entity_value,
+			e.entity_type,
+			e.file_name,
+			n.notice_title,
+			e.file_url,
+			n.created_at
+
+		FROM tb_notice n
+		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+
+		WHERE
+		<foreach collection="keywords" item="keyword" separator=" OR ">
+			n.notice_title LIKE CONCAT('%', #{keyword}, '%')
+			OR e.entity_value LIKE CONCAT('%', #{keyword}, '%')
+		</foreach>
+		ORDER BY n.created_at DESC
 	</select>
-	
+
 	<!-- 키워드 사전 저장(없을 때) -->
 	<insert id="insertKeyword">
 		INSERT IGNORE INTO tb_keyword (standard_word)
-		VALUES (#{word})
+		VALUES
+		(#{word})
 	</insert>
-	
+
 	<!-- 정규화된 단어로 ID 조회 -->
 	<select id="selectKeywordIdByWord" resultType="long">
-		SELECT keyword_id FROM tb_keyword
+		SELECT keyword_id
+		FROM tb_keyword
 		WHERE standard_word = #{word}
 	</select>
-	
+
 	<!-- 공고-키워드 매핑 저장 -->
 	<insert id="insertNoticeKeywordMap">
-		INSERT IGNORE INTO tb_notice_keyword_map (notice_number, keyword_id, entity_type, file_name)
+		INSERT IGNORE INTO tb_notice_keyword_map
+		(notice_number, keyword_id, entity_type, file_name)
 		VALUES(#{noticeNumber}, #{keywordId}, #{entityType}, #{fileName})
 	</insert>
-	
+
 	<!-- 키워드 ID로 해당 키워드를 등록한 회원 조회 -->
 	<select id="selectMembersByKeywordId" resultType="long">
-	    SELECT member_id FROM tb_member_keyword WHERE keyword_id = #{keywordId}
+		SELECT member_id
+		FROM tb_member_keyword
+		WHERE keyword_id = #{keywordId}
 	</select>
 
 	<!-- 신규 공고 저장 시, 제목과 실시간으로 매칭할 전체 등록 키워드 목록 -->
 	<select id="selectAllKeywords" resultType="map">
-	    SELECT keyword_id AS keyword_id, standard_word AS standard_word
-	    FROM tb_keyword
+		SELECT keyword_id AS keyword_id, standard_word AS standard_word
+		FROM tb_keyword
 	</select>
 
 </mapper>

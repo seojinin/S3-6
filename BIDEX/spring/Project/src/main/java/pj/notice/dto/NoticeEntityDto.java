@@ -4,9 +4,9 @@ import lombok.Data;
 
 @Data
 public class NoticeEntityDto {
-	private String text;
-	private String type;
-	private String fileName;
-	private String noticeNumber;
-	private String fileUrl;
+    private String text;
+    private String type;
+    private String fileName;
+    private String noticeNumber;
+    private String fileUrl;
 }

@@ -113,9 +113,26 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
     public List<NoticeEntityModel> searchByKeyword(String keyword) {
 	return entityMapper.searchByKeyword(keyword);
     }
+//
+//    @Override
+//    public List<NoticeEntityModel> searchByKeywords(List<String> keywords) {
+//	return entityMapper.searchByKeywords(keywords);
+//    }
 
     @Override
     public List<NoticeEntityModel> searchByKeywords(List<String> keywords) {
-	return entityMapper.searchByKeywords(keywords);
+
+	List<NoticeEntityModel> list = entityMapper.searchByKeywords(keywords);
+
+	System.out.println("-----공고 검색 시작-----");
+
+	for (NoticeEntityModel n : list) {
+	    System.out.println("번호=" + n.getNoticeNumber());
+	    System.out.println("제목=" + n.getNoticeTitle());
+	}
+
+	System.out.println("-----공고 검색 종료-----");
+
+	return list;
     }
 }

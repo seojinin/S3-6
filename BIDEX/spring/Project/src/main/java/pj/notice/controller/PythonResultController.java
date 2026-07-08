@@ -18,7 +18,7 @@ public class PythonResultController {
 
     @PostMapping("/ner-result")
     public String receiveNerResult(@RequestBody NoticeEntityBulkRequest request) {
-        entityService.saveBulk(request);
-        return "NER result saved";
+	entityService.saveBulk(request);
+	return "NER result saved";
     }
 }

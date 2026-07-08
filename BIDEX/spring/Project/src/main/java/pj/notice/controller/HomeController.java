@@ -8,6 +8,6 @@ public class HomeController {
 
     @GetMapping("/sec_fin")
     public String index() {
-        return "sec_fin";   // templates/index.html
+	return "sec_fin"; // templates/index.html
     }
 }

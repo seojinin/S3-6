@@ -6,37 +6,37 @@
 <mapper namespace="pj.notice.mapper.NoticeMapper">
 
 	<insert id="insertNotice">
-	    insert ignore into tb_notice
-	    (notice_number, notice_title, contract_method, amount, agency, region, demand_agency)
-	    values
-	    (#{noticeNumber}, #{noticeTitle}, #{contractMethod}, #{amount}, #{agency}, #{region}, #{demandAgency})
+		INSERT IGNORE INTO tb_notice
+		(notice_number,	notice_title, contract_method, amount, agency, region, demand_agency)
+		VALUES
+		(#{noticeNumber}, #{noticeTitle}, #{contractMethod}, #{amount},	#{agency}, #{region}, #{demandAgency})
 	</insert>
 
 	<select id="selectNoticeById" resultType="pj.notice.model.NoticeModel">
-		select *
-		from tb_notice
-		where notice_id = #{noticeId}
+		SELECT * FROM tb_notice
+		WHERE notice_id = #{noticeId}
 	</select>
 
 	<!-- 키워드 검색도 가능하게 하려고 수정 -->
 	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
-    SELECT
-        n.notice_id,
-        n.notice_number,
-        n.notice_title,
-        n.contract_method,
-        n.amount,
-        n.region,
-        n.agency,
-        n.demand_agency,
-        n.bid_start,
-        n.bid_end,
-        n.created_at,
-        GROUP_CONCAT(DISTINCT e.entity_value SEPARATOR ', ') AS entity_value,
-        GROUP_CONCAT(DISTINCT e.file_name SEPARATOR ', ') AS file_name,
-        GROUP_CONCAT(DISTINCT e.file_url SEPARATOR ', ') AS file_url
-    FROM tb_notice n
-    LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
-    GROUP BY n.notice_id
-</select>
+		SELECT
+			n.notice_id,
+			n.notice_number,
+			n.notice_title,
+			n.contract_method,
+			n.amount,
+			n.region,
+			n.agency,
+			n.demand_agency,
+			n.bid_start,
+			n.bid_end,
+			n.created_at,
+			GROUP_CONCAT(DISTINCT e.entity_value SEPARATOR ', ') AS entity_value,
+			GROUP_CONCAT(DISTINCT e.file_name SEPARATOR '| ') AS file_name,
+			GROUP_CONCAT(DISTINCT e.file_url SEPARATOR '| ') AS file_url
+
+		FROM tb_notice n
+		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+		GROUP BY n.notice_id
+	</select>
 </mapper>

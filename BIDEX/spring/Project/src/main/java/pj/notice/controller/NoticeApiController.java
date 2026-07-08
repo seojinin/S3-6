@@ -16,26 +16,26 @@ import pj.notice.service.NoticeApiServiceIF;
 @RequestMapping("/api/notices")
 public class NoticeApiController {
 
-	@Autowired
-	private NoticeApiServiceIF service;
+    @Autowired
+    private NoticeApiServiceIF service;
 
-	@GetMapping
-	public List<NoticeModel> getNotices() {
-		return service.getAllNotices();
-	}
+    @GetMapping
+    public List<NoticeModel> getNotices() {
+	return service.getAllNotices();
+    }
 
-	@GetMapping("/fetch")
-	public String fetchApi() {
+    @GetMapping("/fetch")
+    public String fetchApi() {
 
-		service.fetchNoticeFromApi();
+	service.fetchNoticeFromApi();
 
-		return "api data saved";
-	}
+	return "api data saved";
+    }
 
-	@GetMapping("/{noticeNumber}/detail")
-	public Map<String, Object> getNoticeDetail(@PathVariable String noticeNumber) {
-		return service.getNoticeDetailLive(noticeNumber);
-	}
+    @GetMapping("/{noticeNumber}/detail")
+    public Map<String, Object> getNoticeDetail(@PathVariable String noticeNumber) {
+	return service.getNoticeDetailLive(noticeNumber);
+    }
 
 //    // 공공 API 호출
 //    @PostMapping("/fetch")

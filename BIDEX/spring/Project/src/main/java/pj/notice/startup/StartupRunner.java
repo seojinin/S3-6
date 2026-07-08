@@ -15,9 +15,9 @@ public class StartupRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
 
-        System.out.println("Spring started → Fetch API 실행");
+	System.out.println("Spring started → Fetch API 실행");
 
-        service.fetchNoticeFromApi();
+	service.fetchNoticeFromApi();
 
     }
 }

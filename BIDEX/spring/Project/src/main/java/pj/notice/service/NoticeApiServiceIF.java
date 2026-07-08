@@ -7,10 +7,10 @@ import pj.notice.model.NoticeModel;
 
 public interface NoticeApiServiceIF {
 
-	void fetchNoticeFromApi();
+    void fetchNoticeFromApi();
 
-	List<NoticeModel> getAllNotices();
+    List<NoticeModel> getAllNotices();
 
-	Map<String, Object> getNoticeDetailLive(String noticeNumber);
-	
+    Map<String, Object> getNoticeDetailLive(String noticeNumber);
+
 }
