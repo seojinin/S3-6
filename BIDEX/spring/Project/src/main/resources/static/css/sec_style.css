@@ -342,12 +342,31 @@ section.active {
     gap: 8px;
 }
 
-.keyword-edit-buttons button {
-    padding: 8px 16px;
+.btn-edit,
+.btn-confirm,
+.btn-bulk-delete {
+    padding: 7px 16px;
     border: none;
-    border-radius: 6px;
+    border-radius: 7px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    transition: background-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.btn-edit:hover,
+.btn-confirm:hover,
+.btn-bulk-delete:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+.btn-edit:active,
+.btn-confirm:active,
+.btn-bulk-delete:active {
+    transform: scale(0.97);
+    box-shadow: none;
 }
 
 .btn-edit {
@@ -355,14 +374,26 @@ section.active {
     color: white;
 }
 
+.btn-edit:hover {
+    background: #1d4ed8;
+}
+
 .btn-confirm {
     background: #10b981;
     color: white;
 }
 
+.btn-confirm:hover {
+    background: #059669;
+}
+
 .btn-bulk-delete {
     background: #ef4444;
     color: white;
+}
+
+.btn-bulk-delete:hover {
+    background: #dc2626;
 }
 
 /* ===== Feature ===== */

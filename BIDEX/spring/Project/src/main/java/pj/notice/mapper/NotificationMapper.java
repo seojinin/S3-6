@@ -16,6 +16,8 @@ public interface NotificationMapper {
 
     void updateReadStatus(@Param("notificationId") Long notificationId, @Param("memberId") Long memberId);
 
+    void updateAllReadStatus(@Param("memberId") Long memberId);
+
     int countUnread(@Param("memberId") Long memberId);
 
 }

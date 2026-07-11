@@ -47,6 +47,8 @@ function setLoggedInUI() {
     document.getElementById('divider').style.display = 'inline';
     document.getElementById('notificationBell').classList.add('show');
     document.getElementById('mainKeywordPanel').classList.add('show');
+    const heroLoginBtn = document.getElementById('heroLoginBtn');
+    if (heroLoginBtn) heroLoginBtn.style.display = 'none';
     loadUserKeywords();
     updateUnreadBadge();
 }
@@ -62,6 +64,8 @@ function setLoggedOutUI() {
     document.getElementById('divider').style.display = 'none';
     document.getElementById('notificationBell').classList.remove('show');
     document.getElementById('mainKeywordPanel').classList.remove('show');
+    const heroLoginBtn = document.getElementById('heroLoginBtn');
+    if (heroLoginBtn) heroLoginBtn.style.display = 'inline-block';
     updateUnreadBadge();
 }
 
@@ -158,12 +162,28 @@ function restoreBidState() {
 
 // ===== 초기화 =====
 window.addEventListener('DOMContentLoaded', () => {
-    history.replaceState({ page: 'main' }, '', '#main');
     fetchBidList();
     checkLoginStatus();
-    // 로그인 상태일 때만 서버에서 안읽은 알림 개수를 주기적으로 갱신
-    setInterval(updateUnreadBadge, 10000);
+    restoreInitialPage(); // 새로고침해도 URL 해시를 보고 있던 페이지 그대로 복원
+    // 로그인 상태일 때 알림을 새로고침 없이 실시간에 가깝게 갱신
+    // (드롭다운/마이페이지 알림탭이 열려있으면 전체 목록을, 아니면 뱃지 숫자만)
+    setInterval(pollNotifications, 4000);
 });
+
+// 새로고침 시 현재 URL 해시를 읽어서 그 페이지를 복원 (없으면 메인으로)
+function restoreInitialPage() {
+    const hash = location.hash.replace('#', '');
+
+    if (hash.startsWith('bidDetail:')) {
+        const noticeNumber = decodeURIComponent(hash.substring('bidDetail:'.length));
+        if (noticeNumber) { showBidDetail(noticeNumber, false); return; }
+    }
+
+    const validPages = ['main', 'bid', 'mypage', 'login'];
+    const page = validPages.includes(hash) ? hash : 'main';
+    showPage(page, false);
+    if (!hash) history.replaceState({ page: 'main' }, '', '#main');
+}
 
 // ===== 목록 호출 =====
 async function fetchBidList(page = 1) {
@@ -290,8 +310,11 @@ function renderMainBidTable() {
 }
 
 // ===== 상세 페이지 =====
-async function showBidDetail(notice_number) {
-    showPage('bidDetail');
+async function showBidDetail(notice_number, pushHistory = true) {
+    showPage('bidDetail', false);
+    if (pushHistory) {
+        history.pushState({ page: 'bidDetail', notice_number }, '', '#bidDetail:' + encodeURIComponent(notice_number));
+    }
     try {
         const res  = await fetch(`http://localhost:8080/api/notices/${notice_number}/detail`);
         const data = await res.json();
@@ -463,6 +486,7 @@ function switchMpTab(tab) {
         if (side)  side.classList.toggle('active',  t === tab);
         if (panel) panel.classList.toggle('active', t === tab);
     });
+    if (tab === 'noti') fetchNotificationsFromDB();
 }
 
 // ===== 로딩/에러 =====
@@ -689,15 +713,17 @@ function loadMypageKeywordList() {
     const kws=userKeywords, kc=DB.getKeywordChecks();
     const container=document.getElementById('mypageKeywordList');
     if (kws.length===0) { container.innerHTML='<p style="color:#999;text-align:center;padding:20px;">등록된 키워드가 없습니다.</p>'; return; }
-    const sorted=[...kws].sort((a,b)=>{ const ac=kc[a]||false,bc=kc[b]||false; if(ac&&!bc)return -1; if(!ac&&bc)return 1; return a.localeCompare(b,'ko'); });
+    // 명시적으로 체크 해제(false)한 적 없으면 기본값은 "체크됨"(알림 켜짐)
+    const isChecked = kw => kc[kw] !== false;
+    const sorted=[...kws].sort((a,b)=>{ const ac=isChecked(a),bc=isChecked(b); if(ac&&!bc)return -1; if(!ac&&bc)return 1; return a.localeCompare(b,'ko'); });
     container.innerHTML=sorted.map(kw=>`
-        <div class="keyword-item ${isKeywordEditMode?'edit-mode':''} ${kc[kw]?'checked':''}" onclick="event.stopPropagation()">
-            <input type="checkbox" class="keyword-item-checkbox" ${kc[kw]?'checked':''} onchange="toggleKeywordCheck('${kw}',this.checked)">
+        <div class="keyword-item ${isKeywordEditMode?'edit-mode':''} ${isChecked(kw)?'checked':''}" onclick="event.stopPropagation()">
+            <input type="checkbox" class="keyword-item-checkbox" ${isChecked(kw)?'checked':''} onchange="toggleKeywordCheck('${kw}',this.checked)">
             <span class="keyword-item-text">${kw}</span>
             <button class="keyword-item-delete" onclick="deleteKeyword('${kw}')"><i class="fa-solid fa-trash-can"></i></button>
         </div>`).join('');
 }
-function toggleKeywordCheck(kw,checked) { DB.setKeywordCheck(kw,checked); loadMypageKeywordList(); }
+function toggleKeywordCheck(kw,checked) { DB.setKeywordCheck(kw,checked); loadMypageKeywordList(); fetchNotificationsFromDB(); }
 function toggleKeywordEditMode() {
     isKeywordEditMode=!isKeywordEditMode;
     const eb=document.getElementById('keywordEditBtn'),bd=document.getElementById('keywordBulkDeleteBtn'),ab=document.getElementById('keywordAddBtn');
@@ -782,37 +808,83 @@ async function deleteKeyword(kw) {
 function loadNotifications() { fetchNotificationsFromDB(); }
 function loadNotificationDropdown() { fetchNotificationsFromDB(); }
 
-// 알림 목록 전체 조회 (드롭다운을 열거나 마이페이지 진입 시에만 호출)
+// 각 요청 종류별로 "가장 마지막에 보낸 요청의 응답만" 반영하기 위한 순번 (서로 다른 종류끼리는 간섭하지 않음)
+let listFetchSeq = 0;
+
+// 직전에 확인한 안읽은 알림 개수 (null이면 아직 모름 = 최초 로드, 이때는 토스트를 띄우지 않음)
+let lastKnownUnreadCount = null;
+
+// 뱃지 숫자를 갱신하고, 개수가 "늘어났을 때"만 화면 우측 상단에 토스트로 알려줌
+function applyUnreadCount(count) {
+    const badge = document.getElementById('notificationBadge');
+    if (badge) { badge.textContent = count; badge.style.display = count === 0 ? 'none' : 'flex'; }
+
+    if (lastKnownUnreadCount !== null && count > lastKnownUnreadCount) {
+        showNotificationToast(count - lastKnownUnreadCount);
+    }
+    lastKnownUnreadCount = count;
+}
+
+// 새 알림 도착을 알려주는 자동 소멸 토스트 (새로고침 없이도 눈에 띄게)
+function showNotificationToast(newCount) {
+    let toast = document.getElementById('liveNotiToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'liveNotiToast';
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#2563eb;color:#fff;padding:14px 20px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.2);font-size:14px;font-weight:600;z-index:99999;cursor:pointer;transition:opacity 0.3s;max-width:320px;';
+        toast.onclick = () => { toast.style.display='none'; toggleNotificationDropdown(); };
+        document.body.appendChild(toast);
+    }
+    toast.textContent = `🔔 새로운 알림이 ${newCount}건 도착했습니다`;
+    toast.style.opacity = '1';
+    toast.style.display = 'block';
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => { toast.style.display = 'none'; }, 300);
+    }, 4000);
+}
+
+// 마이페이지 "관심 키워드"에서 체크(✓) 해제된 키워드인지 확인 (명시적으로 체크 해제한 것만 알림에서 제외, 기본은 켜짐)
+function isKeywordChecked(keyword) {
+    const kc = DB.getKeywordChecks();
+    return kc[keyword] !== false;
+}
+
+// 알림 목록 전체 조회 (드롭다운을 열거나 마이페이지 진입 시, 또는 폴링 시 호출)
+// + 체크된 키워드의 알림만 남기고 필터링
 async function fetchNotificationsFromDB() {
     if (!currentMember) { renderNotifications([]); return; }
+    const seq = ++listFetchSeq;
     try {
-        const res = await fetch('http://localhost:8080/api/notifications', { credentials: 'include' });
+        const res = await fetch('http://localhost:8080/api/notifications', { credentials: 'include', cache: 'no-store' });
         if (!res.ok) {
             if (res.status === 401) renderNotifications([]);
             return;
         }
         const notis = await res.json();
-        renderNotifications(notis);
+        if (seq !== listFetchSeq) return; // 그 사이 더 최신 "목록 조회"가 있었으면 이 응답은 무시 (깜빡임 방지)
+        renderNotifications(notis.filter(n => isKeywordChecked(n.keyword)));
     } catch (e) {
         console.error('알림 조회 API 호출 실패:', e);
     }
 }
 
-// 안읽은 알림 개수만 가볍게 조회 (뱃지 폴링용)
+// 뱃지 갱신 (체크된 키워드만 반영해야 하므로 전체 목록을 받아와서 판단 → fetchNotificationsFromDB에 위임)
 async function updateUnreadBadge() {
-    const badge = document.getElementById('notificationBadge');
     if (!currentMember) {
+        const badge = document.getElementById('notificationBadge');
         if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
+        lastKnownUnreadCount = null;
         return;
     }
-    try {
-        const res = await fetch('http://localhost:8080/api/notifications/unread-count', { credentials: 'include' });
-        if (!res.ok) return;
-        const count = await res.json();
-        if (badge) { badge.textContent = count; badge.style.display = count === 0 ? 'none' : 'flex'; }
-    } catch (e) {
-        console.error('안읽은 알림 개수 조회 실패:', e);
-    }
+    await fetchNotificationsFromDB();
+}
+
+// 새로고침 없이 실시간에 가깝게 알림 갱신 (뱃지 + 열려있는 드롭다운/마이페이지 알림탭 내용까지 함께 갱신)
+function pollNotifications() {
+    if (!currentMember) return;
+    fetchNotificationsFromDB();
 }
 
 // 알림 읽음 처리 (서버에 PUT 요청)
@@ -828,10 +900,25 @@ async function markNotificationRead(notificationId) {
     }
 }
 
+// 전체 알림 읽음 처리
+async function markAllNotificationsRead() {
+    if (!currentMember) return;
+    try {
+        const res = await fetch('http://localhost:8080/api/notifications/read-all', {
+            method: 'PUT',
+            credentials: 'include'
+        });
+        if (!res.ok) { showAlert('전체 읽음 처리에 실패했습니다.'); return; }
+        await fetchNotificationsFromDB();
+    } catch (e) {
+        console.error('전체 읽음 처리 실패:', e);
+        showAlert('서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.');
+    }
+}
+
 function renderNotifications(notis) {
     const unreadCount = notis.filter(n => !n.is_read).length;
-    const badge = document.getElementById('notificationBadge');
-    if (badge) { badge.textContent = unreadCount; badge.style.display = unreadCount === 0 ? 'none' : 'flex'; }
+    applyUnreadCount(unreadCount);
 
     const dropdownContent = document.getElementById('notificationDropdownContent');
     if (dropdownContent) {
@@ -839,9 +926,9 @@ function renderNotifications(notis) {
             dropdownContent.innerHTML = '<div class="notification-dropdown-empty">새로운 알림이 없습니다.</div>';
         } else {
             dropdownContent.innerHTML = notis.slice(0,5).map(n => `
-                <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})" style="cursor:pointer;${n.is_read ? 'opacity:0.6;' : ''}">
+                <div class="notification-dropdown-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})" style="cursor:pointer;${n.is_read ? 'background:#f3f4f6;opacity:0.65;' : ''}">
                     <strong style="color:#2563eb;">[${n.keyword || '알림'}]</strong> ${n.notice_title || '새로운 공고가 등록되었습니다.'}<br>
-                    <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}</span>
+                    <span style="font-size:11px;color:#9ca3af;">${n.created_at || '-'}${n.is_read ? ' · 읽음' : ''}</span>
                 </div>`).join('');
         }
     }
@@ -852,10 +939,13 @@ function renderNotifications(notis) {
             mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
         } else {
             mypageList.innerHTML = notis.map(n => `
-                <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})" style="cursor:pointer;margin-bottom:10px;border-left:4px solid ${n.is_read ? '#d1d5db' : '#2563eb'};padding-left:15px;${n.is_read ? 'opacity:0.6;' : ''}">
+                <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})"
+                     style="cursor:pointer;margin-bottom:10px;border-left:4px solid ${n.is_read ? '#d1d5db' : '#2563eb'};padding:10px 15px;border-radius:6px;
+                            background:${n.is_read ? '#f3f4f6' : '#eff6ff'};">
                     <div>
-                        <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
-                        <strong>${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                        <span style="background:${n.is_read ? '#e5e7eb' : '#e0e7ff'};color:${n.is_read ? '#6b7280' : '#4338ca'};padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
+                        <strong style="color:${n.is_read ? '#9ca3af' : '#111827'};">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                        ${n.is_read ? '<span style="margin-left:8px;font-size:11px;color:#9ca3af;">✓ 읽음</span>' : ''}
                     </div>
                     <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
                     <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="읽음 처리">×</button>
@@ -868,7 +958,6 @@ function renderNotifications(notis) {
 async function deleteNotification(notificationId) {
     await markNotificationRead(notificationId);
     await fetchNotificationsFromDB();
-    updateUnreadBadge();
 }
 
 function toggleNotificationDropdown() {

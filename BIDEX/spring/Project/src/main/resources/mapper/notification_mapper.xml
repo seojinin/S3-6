@@ -6,25 +6,30 @@
 <mapper namespace="pj.notice.mapper.NotificationMapper">
 
 	<insert id="insertNotification">
-		INSERT INTO tb_notification (member_id, notice_number, message)
-		VALUES (#{memberId}, #{noticeNumber}, #{message})
+		INSERT INTO tb_notification (member_id,
+		notice_number, message)
+		VALUES (#{memberId}, #{noticeNumber},
+		#{message})
 	</insert>
 
 	<select id="selectByMemberId"
 		resultType="pj.notice.model.NotificationModel">
 		SELECT
-			nt.notification_id,
-			nt.member_id,
-			nt.notice_number,
-			nt.message,
-			nt.is_read,
-			nt.created_at,
-			n.notice_title,
-			/* 메시지에서 [키워드] 형태를 추출하거나, 매칭된 키워드 정보가 따로 없다면 메시지 자체에서 파싱하도록 처리 */
-			SUBSTRING_INDEX(SUBSTRING_INDEX(nt.message, ']', 1), '[', -1) as keyword
-
+		nt.notification_id,
+		nt.member_id,
+		nt.notice_number,
+		nt.message,
+		nt.is_read,
+		nt.created_at,
+		n.notice_title,
+		/* 메시지에서 [키워드] 형태를
+		추출하거나,
+		매칭된 키워드 정보가 따로 없다면 메시지 자체에서 파싱하도록 처리 */
+		SUBSTRING_INDEX(SUBSTRING_INDEX(nt.message, ']', 1), '[', -1) as
+		keyword
 		FROM tb_notification nt
-		LEFT JOIN tb_notice n ON nt.notice_number = n.notice_number
+		LEFT JOIN tb_notice n ON
+		nt.notice_number = n.notice_number
 		WHERE nt.member_id = #{memberId}
 		ORDER BY nt.created_at DESC
 	</select>
@@ -36,9 +41,17 @@
 		AND member_id = #{memberId}
 	</update>
 
+	<update id="updateAllReadStatus">
+		UPDATE tb_notification
+		SET is_read = TRUE
+		WHERE member_id = #{memberId}
+		AND is_read = FALSE
+	</update>
+
 	<select id="countUnread" resultType="int">
 		SELECT COUNT(*)
-		FROM tb_notification
+		FROM
+		tb_notification
 		WHERE member_id = #{memberId}
 		AND is_read = FALSE
 	</select>

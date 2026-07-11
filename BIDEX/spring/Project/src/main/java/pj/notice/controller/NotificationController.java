@@ -48,6 +48,20 @@ public class NotificationController {
 	return ResponseEntity.ok("읽음 처리 완료");
     }
 
+    @PutMapping("/read-all")
+    public ResponseEntity<String> markAllAsRead(Authentication authentication) {
+
+	if (authentication == null || !authentication.isAuthenticated()) {
+	    return ResponseEntity.status(401).build();
+	}
+
+	CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+
+	notificationMapper.updateAllReadStatus(user.getMemberId());
+
+	return ResponseEntity.ok("전체 읽음 처리 완료");
+    }
+
     @GetMapping("/unread-count")
     public ResponseEntity<Integer> getUnreadCount(Authentication authentication) {
 
