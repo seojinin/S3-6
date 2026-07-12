@@ -41,8 +41,7 @@
 	</select>
 
 	<!-- 다중 키워드 검색 -->
-	<select id="searchByKeywords"
-		resultType="pj.notice.model.NoticeEntityModel">
+	<select id="searchByKeywords" resultType="pj.notice.model.NoticeEntityModel">
 		SELECT DISTINCT
 			e.entity_id,
 			n.notice_number,

@@ -1,21 +1,23 @@
 package pj.notice.service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import pj.notice.mapper.NoticeEntityMapper;
+import pj.notice.dto.FileInfoDto;
 import pj.notice.mapper.NoticeMapper;
 import pj.notice.model.NoticeModel;
-import pj.notice.dto.FileInfoDto;
 
 @Service
 public class NoticeApiServiceImpl implements NoticeApiServiceIF {
@@ -23,109 +25,160 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
     @Autowired
     private NoticeMapper noticeMapper;
 
-    @Autowired
-    private NoticeEntityMapper noticeEntityMapper;
-
-    @Autowired
-    private NotificationIF notificationIF;
-
     private RestTemplate restTemplate = new RestTemplate();
 
     private String serviceKey = "b801f42df1eaeb53e32ca3e08185a477ce2e0a1988d6c5f841370e09d5717190";
 
     @Override
+    @Scheduled(fixedDelay = 60000)
     public void fetchNoticeFromApi() {
 
-	try {
-	    String url = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
-		    + "?serviceKey=" + serviceKey + "&pageNo=1" + "&numOfRows=100" + "&inqryDiv=1"
-		    + "&inqryBgnDt=202601180000" + "&inqryEndDt=202601312359" + "&type=json";
+	LocalDate today = LocalDate.now();
 
-	    String result = restTemplate.getForObject(url, String.class);
+	String begin = today.minusDays(3).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+	String end = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+	System.out.println("========== 공고 수집 시작 ==========");
+
+	try {
 
 	    ObjectMapper mapper = new ObjectMapper();
-	    JsonNode root = mapper.readTree(result);
 
-	    JsonNode items = root.path("response").path("body").path("items");
+	    int pageNo = 1;
 
-	    if (items.isArray()) {
+	    while (true) {
+
+		String url =
+	                "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
+	                + "?serviceKey=" + serviceKey
+	                + "&pageNo=" + pageNo
+	                + "&numOfRows=100"
+	                + "&inqryDiv=1"
+	                + "&inqryBgnDt=" + begin + "0000"
+	                + "&inqryEndDt=" + end + "2359"
+	                + "&type=json";
+
+		String result = restTemplate.getForObject(url, String.class);
+
+		JsonNode root = mapper.readTree(result);
+
+		JsonNode items = root.path("response").path("body").path("items");
+
+		// 더 이상 조회할 공고가 없으면 종료
+		if (!items.isArray() || items.size() == 0) {
+		    break;
+		}
+
+		System.out.println("페이지 " + pageNo + " 조회 (" + items.size() + "건)");
+
 		for (JsonNode node : items) {
-		    saveNotice(node);
+
+		    boolean inserted = saveNotice(node);
+
+		    if (!inserted) {
+			System.out.println("기존 공고 → 처리 생략 : " + node.path("bidNtceNo").asText());
+			continue;
+		    }
+
+		    System.out.println("신규 공고 저장 : " + node.path("bidNtceNo").asText());
+
 		    List<FileInfoDto> files = extractFilesFromNotice(node);
+
 		    sendFilesToPython(files);
 		}
+
+		pageNo++;
 	    }
 
 	} catch (Exception e) {
 	    e.printStackTrace();
 	}
+
+	System.out.println("========== 공고 수집 종료 ==========");
     }
 
-    private void saveNotice(JsonNode node) {
+    private boolean saveNotice(JsonNode node) {
 
 	try {
+
 	    NoticeModel notice = new NoticeModel();
+
 	    notice.setNoticeNumber(node.path("bidNtceNo").asText());
+
 	    notice.setNoticeTitle(node.path("bidNtceNm").asText());
+
 	    notice.setContractMethod(node.path("cntrctCnclsMthdNm").asText());
 
 	    String amtStr = node.path("bdgtAmt").asText().trim();
+
 	    Long amount = null;
 
-	    if (amtStr != null && !amtStr.isEmpty() && !amtStr.equals("-")) {
+	    if (amtStr != null && !amtStr.isEmpty()) {
+
 		amtStr = amtStr.replaceAll("[^0-9]", "");
+
 		if (!amtStr.isEmpty()) {
+
 		    amount = Long.parseLong(amtStr);
+
 		}
 	    }
+
 	    notice.setAmount(amount);
 
 	    notice.setAgency(node.path("ntceInsttNm").asText());
+
 	    notice.setDemandAgency(node.path("dminsttNm").asText());
+
 	    notice.setRegion(node.path("cnstrtsiteRgnNm").asText());
 
-	    noticeMapper.insertNotice(notice);
+	    int result = noticeMapper.insertNotice(notice);
 
-	    // 🔔 신규 공고 제목과 회원들이 등록한 키워드를 실시간으로 비교해서 알림 생성
-	    checkKeywordMatchAndNotify(notice);
+	    return result > 0;
 
 	} catch (Exception e) {
+
 	    e.printStackTrace();
+
+	    return false;
+
 	}
+
     }
 
     // 신규 공고 제목에 등록된 키워드가 포함되어 있으면, 그 키워드를 등록한 회원에게 알림 생성
-    private void checkKeywordMatchAndNotify(NoticeModel notice) {
-
-	try {
-	    String title = notice.getNoticeTitle();
-	    if (title == null || title.isEmpty()) {
-		return;
-	    }
-
-	    List<Map<String, Object>> keywords = noticeEntityMapper.selectAllKeywords();
-
-	    for (Map<String, Object> row : keywords) {
-
-		Object idObj = row.get("keyword_id");
-		Object wordObj = row.get("standard_word");
-
-		if (idObj == null || wordObj == null) {
-		    continue;
-		}
-
-		Long keywordId = ((Number) idObj).longValue();
-		String word = wordObj.toString();
-
-		if (!word.isEmpty() && title.contains(word)) {
-		    notificationIF.createKeywordNotifications(keywordId, word, notice.getNoticeNumber());
-		}
-	    }
-
-	} catch (Exception e) {
-	    e.printStackTrace();
-	}
-    }
+//    private void checkKeywordMatchAndNotify(NoticeModel notice) {
+//
+//	try {
+//	    String title = notice.getNoticeTitle();
+//	    if (title == null || title.isEmpty()) {
+//		return;
+//	    }
+//
+//	    List<Map<String, Object>> keywords = noticeEntityMapper.selectAllKeywords();
+//
+//	    for (Map<String, Object> row : keywords) {
+//
+//		Object idObj = row.get("keyword_id");
+//		Object wordObj = row.get("standard_word");
+//
+//		if (idObj == null || wordObj == null) {
+//		    continue;
+//		}
+//
+//		Long keywordId = ((Number) idObj).longValue();
+//		String word = wordObj.toString();
+//
+//		if (!word.isEmpty() && title.contains(word)) {
+//		    notificationIF.createKeywordNotifications(keywordId, word, notice.getNoticeNumber());
+//		}
+//	    }
+//
+//	} catch (Exception e) {
+//	    e.printStackTrace();
+//	}
+//    }
 
     private List<FileInfoDto> extractFilesFromNotice(JsonNode node) {
 
@@ -191,73 +244,97 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 	return noticeMapper.selectAllNotices();
     }
 
-    // 🔥 핵심 수정된 부분
     public Map<String, Object> getNoticeDetailLive(String noticeNumber) {
+
+	LocalDate today = LocalDate.now();
+
+	String begin = today.minusDays(3).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+	String end = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
 	Map<String, Object> result = new HashMap<>();
 
 	try {
-	    String url = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
-		    + "?serviceKey=" + serviceKey + "&pageNo=1" + "&numOfRows=100" + "&inqryDiv=1"
-		    + "&inqryBgnDt=202601180000" + "&inqryEndDt=202601312359" + "&type=json";
-
-	    String response = restTemplate.getForObject(url, String.class);
 
 	    ObjectMapper mapper = new ObjectMapper();
-	    JsonNode items = mapper.readTree(response).path("response").path("body").path("items");
 
-	    for (JsonNode node : items) {
+	    int pageNo = 1;
 
-		if (noticeNumber.equals(node.path("bidNtceNo").asText())) {
+	    while (true) {
 
-		    // ✅ 프론트 기준으로 key 맞춤
-		    result.put("notice_number", node.path("bidNtceNo").asText());
-		    result.put("notice_title", node.path("bidNtceNm").asText());
-		    result.put("contract_method", node.path("cntrctCnclsMthdNm").asText());
-		    result.put("agency", node.path("ntceInsttNm").asText());
-		    result.put("demand_agency", node.path("dminsttNm").asText());
-		    result.put("notice_date", node.path("bidNtceDt").asText());
-		    result.put("opening_date", node.path("opengDt").asText());
+		String url =
+	                "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk"
+	                + "?serviceKey=" + serviceKey
+	                + "&pageNo=" + pageNo
+	                + "&numOfRows=100"
+	                + "&inqryDiv=1"
+	                + "&inqryBgnDt=" + begin + "0000"
+	                + "&inqryEndDt=" + end + "2359"
+	                + "&type=json";
 
-		    // 금액 변환
-		    String amtStr = node.path("bdgtAmt").asText();
-		    Long amount = null;
+		String response = restTemplate.getForObject(url, String.class);
 
-		    if (amtStr != null && !amtStr.isEmpty()) {
-			try {
-			    amtStr = amtStr.replaceAll("[^0-9]", "");
-			    if (!amtStr.isEmpty()) {
-				amount = Long.parseLong(amtStr);
-			    }
-			} catch (Exception e) {
-			    amount = null;
-			}
-		    }
+		JsonNode items = mapper.readTree(response).path("response").path("body").path("items");
 
-		    result.put("amount", amount);
-
-		    result.put("bid_start", node.path("bidNtceDt").asText());
-		    result.put("bid_end", node.path("opengDt").asText());
-		    result.put("biz_type", node.path("rgstTyNm").asText());
-		    result.put("region", node.path("cnstrtsiteRgnNm").asText());
-
-		    List<Map<String, String>> files = new ArrayList<>();
-		    for (int i = 1; i <= 10; i++) {
-			String name = node.path("ntceSpecFileNm" + i).asText();
-			String urlFile = node.path("ntceSpecDocUrl" + i).asText();
-
-			if (!name.isEmpty() && !urlFile.isEmpty()) {
-			    Map<String, String> f = new HashMap<>();
-			    f.put("fileName", name);
-			    f.put("fileUrl", urlFile);
-			    files.add(f);
-			}
-		    }
-
-		    result.put("files", files);
-
-		    return result;
+		// 조회 결과가 없으면 종료
+		if (!items.isArray() || items.size() == 0) {
+		    break;
 		}
+
+		for (JsonNode node : items) {
+
+		    if (noticeNumber.equals(node.path("bidNtceNo").asText())) {
+
+			result.put("notice_number", node.path("bidNtceNo").asText());
+			result.put("notice_title", node.path("bidNtceNm").asText());
+			result.put("contract_method", node.path("cntrctCnclsMthdNm").asText());
+			result.put("agency", node.path("ntceInsttNm").asText());
+			result.put("demand_agency", node.path("dminsttNm").asText());
+			result.put("notice_date", node.path("bidNtceDt").asText());
+			result.put("opening_date", node.path("opengDt").asText());
+
+			String amtStr = node.path("bdgtAmt").asText();
+			Long amount = null;
+
+			if (amtStr != null && !amtStr.isEmpty()) {
+			    try {
+				amtStr = amtStr.replaceAll("[^0-9]", "");
+				if (!amtStr.isEmpty()) {
+				    amount = Long.parseLong(amtStr);
+				}
+			    } catch (Exception e) {
+				amount = null;
+			    }
+			}
+
+			result.put("amount", amount);
+
+			result.put("bid_start", node.path("bidNtceDt").asText());
+			result.put("bid_end", node.path("opengDt").asText());
+			result.put("biz_type", node.path("rgstTyNm").asText());
+			result.put("region", node.path("cnstrtsiteRgnNm").asText());
+
+			List<Map<String, String>> files = new ArrayList<>();
+
+			for (int i = 1; i <= 10; i++) {
+			    String name = node.path("ntceSpecFileNm" + i).asText();
+			    String urlFile = node.path("ntceSpecDocUrl" + i).asText();
+
+			    if (!name.isEmpty() && !urlFile.isEmpty()) {
+				Map<String, String> f = new HashMap<>();
+				f.put("fileName", name);
+				f.put("fileUrl", urlFile);
+				files.add(f);
+			    }
+			}
+
+			result.put("files", files);
+
+			return result;
+		    }
+		}
+
+		pageNo++;
 	    }
 
 	} catch (Exception e) {

@@ -66,9 +66,9 @@ def process_bid(data: dict):
                 entities.append({
                     "text": kw["text"],
                     "type": kw["type"],
-                    "fileName": file_name,
-                    "noticeNumber": bid_no,
-                    "fileUrl": file_url
+                    "file_name": file_name,
+                    "notice_number": bid_no,
+                    "file_url": file_url
 
                 })
         t6 = time.time()

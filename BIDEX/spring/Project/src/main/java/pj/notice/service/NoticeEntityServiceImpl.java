@@ -44,6 +44,10 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 
 	for (NoticeEntityDto dto : request.getEntities()) {
 
+	    System.out.println("noticeNumber = " + dto.getNoticeNumber());
+	    System.out.println("text = " + dto.getText());
+	    System.out.println("file = " + dto.getFileName());
+
 	    // [1] 키워드 정규화
 	    String rawText = dto.getText();
 	    if (rawText == null || rawText.trim().isEmpty())
