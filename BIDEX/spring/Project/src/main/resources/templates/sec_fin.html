@@ -27,6 +27,7 @@
     <div class="notification-dropdown" id="notificationDropdown">
         <div class="notification-dropdown-header">새로운 알림</div>
         <div id="notificationDropdownContent"></div>
+        <div class="notification-dropdown-footer" onclick="goToAllNotifications()">모든 알림 보기</div>
     </div>
 </header>
 
@@ -51,9 +52,21 @@
     </div>
 
     <div class="feature-box">
-        <div class="feature-card"><h3>🎯 키워드 맞춤 추천</h3><p>등록한 관심 키워드에 맞는 공고만 제공합니다.</p></div>
-        <div class="feature-card"><h3>🔍 통합 검색</h3><p>여러 기관의 입찰 정보를 한 번에 검색하세요.</p></div>
-        <div class="feature-card"><h3>🔔 알림 서비스</h3><p>새로운 공고를 놓치지 않도록 알려드립니다.</p></div>
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-blue">🎯</div>
+            <h3>키워드 맞춤 추천</h3>
+            <p>등록한 관심 키워드에 맞는 공고만 제공합니다.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-green">🔍</div>
+            <h3>통합 검색</h3>
+            <p>여러 기관의 입찰 정보를 한 번에 검색하세요.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-orange">🔔</div>
+            <h3>알림 서비스</h3>
+            <p>새로운 공고를 놓치지 않도록 알려드립니다.</p>
+        </div>
     </div>
 
     <div class="main-bid-section">
@@ -171,21 +184,37 @@
 
 <!-- ===== Bid Detail ===== -->
 <section id="bidDetail">
-    <button class="back-btn" onclick="showPage('bid')">&#8592; 목록으로</button>
+    <button class="back-btn" onclick="showPage('bid')">&#8592; 검색결과로 돌아가기</button>
+
+    <div class="detail-header">
+        <div>
+            <h2 id="detailTitle">-</h2>
+            <p class="detail-subtitle">공고번호 <span id="detailNtceNo">-</span></p>
+        </div>
+        <span class="detail-status pending" id="detailStatus">분석 대기중</span>
+    </div>
+
     <div class="detail-card">
-        <h2 id="detailTitle">-</h2>
-        <table class="detail-table">
-            <tr><td class="detail-label">공고번호</td><td id="detailNtceNo">-</td></tr>
-            <tr><td class="detail-label">계약방법</td><td id="detailMethod">-</td></tr>
-            <tr><td class="detail-label">발주기관</td><td id="detailDminstt">-</td></tr>
-            <tr><td class="detail-label">수요기관</td><td id="detailDmndInstt">-</td></tr>
-            <tr><td class="detail-label">사업금액</td><td id="detailAmount">-</td></tr>
-            <tr><td class="detail-label">입찰공고일</td><td id="detailNtceDate">-</td></tr>
-            <tr><td class="detail-label">개찰일시</td><td id="detailOpengDate">-</td></tr>
-            <tr><td class="detail-label">업무구분</td><td id="detailBizType">-</td></tr>
-            <tr><td class="detail-label">지역</td><td id="detailRegion">-</td></tr>
-            <tr><td class="detail-label">첨부파일</td><td id="detailFiles">-</td></tr>
-        </table>
+        <div class="detail-card-header"><i class="fa-solid fa-circle-info"></i> 기본 정보</div>
+        <div class="detail-info-grid">
+            <div class="detail-info-item"><span class="detail-info-label">발주기관</span><span class="detail-info-value" id="detailDminstt">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">수요기관</span><span class="detail-info-value" id="detailDmndInstt">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">계약방법</span><span class="detail-info-value" id="detailMethod">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">사업금액</span><span class="detail-info-value" id="detailAmount">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">공고일</span><span class="detail-info-value" id="detailNtceDate">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">개찰일시</span><span class="detail-info-value" id="detailOpengDate">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">지역</span><span class="detail-info-value" id="detailRegion">-</span></div>
+            <div class="detail-info-item"><span class="detail-info-label">업무구분</span><span class="detail-info-value" id="detailBizType">-</span></div>
+        </div>
+        <div class="detail-files-section">
+            <div class="detail-files-label">첨부파일</div>
+            <div class="detail-files-list" id="detailFiles">-</div>
+        </div>
+    </div>
+
+    <div class="ai-report-section">
+        <h3><i class="fa-solid fa-diagram-project"></i> AI 분석 리포트</h3>
+        <div id="aiReportList"></div>
     </div>
 </section>
 

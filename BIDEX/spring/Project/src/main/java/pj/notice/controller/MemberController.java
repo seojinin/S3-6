@@ -30,7 +30,15 @@ public class MemberController {
 	    memberService.signup(member);
 	    return ResponseEntity.ok("회원가입 성공");
 	} catch (Exception e) {
-	    return ResponseEntity.status(500).body("이미 존재하는 아이디입니다.");
+	    e.printStackTrace(); // 콘솔에 실제 원인을 출력 (진짜 원인 확인용)
+
+	    String msg = e.getMessage();
+	    if (msg != null && msg.contains("이미 존재하는 아이디")) {
+		// 진짜 중복 아이디인 경우
+		return ResponseEntity.status(409).body(msg);
+	    }
+	    // 그 외의 원인 불명 오류는 예외 종류 + 메시지를 그대로 내려줌 (원인 파악용)
+	    return ResponseEntity.status(500).body("회원가입 처리 중 오류가 발생했습니다: [" + e.getClass().getSimpleName() + "] " + msg);
 	}
     }
 
