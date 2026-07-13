@@ -11,6 +11,6 @@ public interface NoticeApiServiceIF {
 
     List<NoticeModel> getAllNotices();
 
-    Map<String, Object> getNoticeDetailLive(String noticeNumber);
+    Map<String, Object> getNoticeDetail(String noticeNumber);
 
 }

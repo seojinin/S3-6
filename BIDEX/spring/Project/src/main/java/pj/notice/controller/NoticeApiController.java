@@ -34,7 +34,7 @@ public class NoticeApiController {
 
     @GetMapping("/{noticeNumber}/detail")
     public Map<String, Object> getNoticeDetail(@PathVariable String noticeNumber) {
-	return service.getNoticeDetailLive(noticeNumber);
+	return service.getNoticeDetail(noticeNumber);
     }
 
 //    // 공공 API 호출

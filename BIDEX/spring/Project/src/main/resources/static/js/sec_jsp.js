@@ -325,8 +325,8 @@ async function showBidDetail(notice_number, pushHistory = true) {
         document.getElementById('detailDminstt').textContent    = data.agency          || '-';
         document.getElementById('detailDmndInstt').textContent  = data.demand_agency   || '-';
         document.getElementById('detailAmount').textContent     = formatAmount(data.amount);
-        document.getElementById('detailNtceDate').textContent   = formatDate(data.bid_start);
-        document.getElementById('detailOpengDate').textContent  = formatDate(data.bid_end);
+        document.getElementById('detailNtceDate').textContent   = formatDate(data.notice_date);
+        document.getElementById('detailOpengDate').textContent  = formatDate(data.opening_date);
         document.getElementById('detailBizType').textContent    = data.biz_type        || '-';
         document.getElementById('detailRegion').textContent     = data.region          || '-';
 
@@ -364,7 +364,7 @@ function renderPagination() {
 // ===== 통계 =====
 function updateBidStats() {
     const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
-    const todayCount = allData.filter(b => String(b.bid_start||'').startsWith(today)).length;
+    const todayCount = allData.filter(b => String(b.notice_date||'').startsWith(today)).length;
     let matchedCount = 0;
     if (currentMember) {
         const kws = userKeywords;

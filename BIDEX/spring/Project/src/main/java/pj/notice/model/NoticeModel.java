@@ -15,8 +15,9 @@ public class NoticeModel {
     private String agency;
     private String demandAgency;
 
-    private LocalDateTime bidStart;
-    private LocalDateTime bidEnd;
+    private String noticeDate;
+    private String openingDate;
+    private String bizType;
 
     private String rawData;
     private LocalDateTime createdAt;
@@ -24,5 +25,4 @@ public class NoticeModel {
     private String entityValue;
     private String fileName;
     private String fileUrl;
-
 }

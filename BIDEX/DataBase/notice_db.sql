@@ -12,12 +12,24 @@ CREATE TABLE tb_notice (
     region VARCHAR(100),                   -- 지역
     agency VARCHAR(255),                   -- 공고 기관
     demand_agency VARCHAR(255),            -- 수요 기관
-    bid_start DATETIME,                    -- 입찰 시작 일시
-    bid_end DATETIME,                      -- 입찰 마감 일시
+
+    notice_date DATETIME,                  -- 입찰공고일
+    opening_date DATETIME,                 -- 개찰일시
+    biz_type VARCHAR(255),                 -- 업무구분
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+
     -- (수정): notice_number로 다른 테이블들이 참조하므로 인덱스 및 유니크 설정 필수
     UNIQUE (notice_number)
+) CHARACTER SET utf8mb4;
+
+CREATE TABLE tb_notice_file (
+    file_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    notice_number VARCHAR(100) NOT NULL,
+    file_name VARCHAR(255),
+    file_url VARCHAR(255),
+
+    FOREIGN KEY (notice_number) REFERENCES tb_notice(notice_number) ON DELETE CASCADE
 ) CHARACTER SET utf8mb4;
 
 -- NER 결과 저장
@@ -30,9 +42,7 @@ CREATE TABLE tb_notice_entity (
     file_url VARCHAR(255),                 -- (수정) 첨부파일 다운로드 경로 (필요 시 API 응답값 저장)
 
     -- 외래키 설정
-    FOREIGN KEY (notice_number)
-        REFERENCES tb_notice(notice_number)
-        ON DELETE CASCADE,
+    FOREIGN KEY (notice_number) REFERENCES tb_notice(notice_number) ON DELETE CASCADE,
 
     -- (notice_number, entity_value, entity_type, file_name) 조합 중복 방지
     UNIQUE KEY uniq_entity (notice_number, entity_value, entity_type, file_name)
@@ -63,9 +73,7 @@ CREATE TABLE tb_keyword_synonym (
     keyword_id BIGINT NOT NULL,                 -- 대표 키워드 ID 참조
     synonym_word VARCHAR(100) UNIQUE NOT NULL,  -- 유사어 (예: 삼성, Samsung)
     
-    FOREIGN KEY (keyword_id) 
-        REFERENCES tb_keyword(keyword_id) 
-        ON DELETE CASCADE
+    FOREIGN KEY (keyword_id) REFERENCES tb_keyword(keyword_id) ON DELETE CASCADE
 ) CHARACTER SET utf8mb4;
 
 -- 회원별 관심 키워드 설정
@@ -87,11 +95,8 @@ CREATE TABLE tb_notice_keyword_map (
     file_name VARCHAR(255),
     
     PRIMARY KEY (notice_number, keyword_id, file_name),
-    FOREIGN KEY (notice_number) 
-        REFERENCES tb_notice(notice_number) 
-        ON DELETE CASCADE,
-    FOREIGN KEY (keyword_id) 
-        REFERENCES tb_keyword(keyword_id)
+    FOREIGN KEY (notice_number) REFERENCES tb_notice(notice_number) ON DELETE CASCADE,
+    FOREIGN KEY (keyword_id) REFERENCES tb_keyword(keyword_id)
 ) CHARACTER SET utf8mb4;
 
 -- 알림 발송 내역
