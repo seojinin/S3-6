@@ -409,7 +409,7 @@ function renderAiReport(entities) {
                 ${list.map(e => {
                     const st = getEntityStyle(e.entity_type);
                     return `<span class="ai-report-chip" style="background:${st.bg};color:${st.color};">
-                        <span class="chip-dot" style="background:${st.color};"></span>${st.label} ${e.entity_value}
+                        <span class="chip-dot" style="background:${st.color};"></span>${e.matched ? "키워드" : ""}${st.label} ${e.entity_value}
                     </span>`;
                 }).join('')}
             </div>

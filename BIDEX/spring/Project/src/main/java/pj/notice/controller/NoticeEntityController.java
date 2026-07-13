@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import pj.security.CustomUserDetails;
 
 import pj.notice.dto.NoticeEntityBulkRequest;
 import pj.notice.dto.NoticeEntityDto;
@@ -38,12 +40,29 @@ public class NoticeEntityController {
     }
 
     // 특정 공고의 엔티티 조회
+    //@GetMapping("/{noticeNumber}/entities")
+    //public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber) {
+
+//	return service.getEntitiesByNoticeNumber(noticeNumber);
+ //   }
+    
+
     @GetMapping("/{noticeNumber}/entities")
-    public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber) {
+    public List<NoticeEntityModel> getEntities(
+            @PathVariable String noticeNumber,
+            Authentication authentication) {
 
-	return service.getEntitiesByNoticeNumber(noticeNumber);
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return List.of();
+        }
+
+        CustomUserDetails user =
+                (CustomUserDetails) authentication.getPrincipal();
+
+        return service.getEntitiesByNoticeNumber(
+                noticeNumber,
+                user.getMemberId());
     }
-
 //	@GetMapping("/entities/search")
 //	public List<NoticeEntityModel> search(@RequestParam String keyword) {
 //		return service.searchByKeyword(keyword);

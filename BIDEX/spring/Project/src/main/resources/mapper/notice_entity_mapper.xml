@@ -15,28 +15,39 @@
 	</insert>
 
 	<!-- 공고 ID로 조회 -->
-	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
-		SELECT e.entity_id, n.notice_number, e.entity_value, e.entity_type,	e.file_name, n.notice_title, e.file_url
-		FROM tb_notice_entity e
-		JOIN tb_notice n ON e.notice_number = n.notice_number
-		WHERE e.notice_number = #{noticeNumber}
-	</select>
-
+	
 	<!-- 키워드 검색 -->
 	<!-- 공고명(제목) 또는 NER 엔티티 값으로 통합 검색 -->
-	<select id="searchByKeyword" resultType="pj.notice.model.NoticeEntityModel">
-		SELECT DISTINCT
-			e.entity_id,
-			n.notice_number,
-			e.entity_value,
-			e.entity_type,
-			e.file_name,
-			n.notice_title,
-			e.file_url
-		FROM tb_notice n
-		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
-		WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%') -- 제목 검색
-		OR e.entity_value LIKE CONCAT('%', #{keyword}, '%') -- NER 키워드 검색
+	<select id=id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
+		SELECT
+    e.entity_id,
+    n.notice_number,
+    e.entity_value,
+    e.entity_type,
+    e.file_name,
+    n.notice_title,
+    e.file_url,
+
+    CASE
+        WHEN mk.keyword_id IS NOT NULL THEN TRUE
+        ELSE FALSE
+    END AS matched
+
+FROM tb_notice_entity e
+
+JOIN tb_notice n
+    ON e.notice_number = n.notice_number
+
+LEFT JOIN tb_keyword k
+    ON LOWER(k.standard_word) = LOWER(e.entity_value)
+
+LEFT JOIN tb_member_keyword mk
+    ON mk.keyword_id = k.keyword_id
+   AND mk.member_id = #{memberId}
+
+WHERE e.notice_number = #{noticeNumber}
+
+ORDER BY e.file_name
 
 	</select>
 
