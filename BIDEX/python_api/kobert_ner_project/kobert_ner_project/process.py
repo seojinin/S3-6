@@ -5,13 +5,22 @@ import pdfplumber
 import requests
 import tempfile
 import zipfile
-
-from tika import parser
+import opendataloader_pdf
+import fitz
+import json
+import shutil
+from pathlib import Path
+import win32com.client
 from lxml import etree
 
 ########################################
 # ===== 설정 =====
 ########################################
+
+hwp = win32com.client.gencache.EnsureDispatch("HWPFrame.HwpObject")
+
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 
 KEEP_TITLE_KEYWORDS = ["자재", "재료", "제품", "기구", "기기", "부속품"]
 KEYWORD_MATCH_MODE = "OR"
@@ -37,29 +46,15 @@ def clean_start(text):
     text = text.strip()
 
     while True:
-        new_text = text
+                new_text = text
 
-        # 숫자 계층
-        new_text = re.sub(r'^\d+([.\-]\d+)*[.\-]?\s*', '', new_text)
-
-        # 숫자 괄호
-        new_text = re.sub(r'^\(?\d+\)\s*', '', new_text)
-
-        # 대괄호 숫자
-        new_text = re.sub(r'^\[\d+\]\s*', '', new_text)
-
-        # 원형 숫자
-        new_text = re.sub(r'^[①②③④⑤⑥⑦⑧⑨⑩]+\s*', '', new_text)
-
-        # 한글 항목
-        new_text = re.sub(r'^[가-힣][\.\)]\s*', '', new_text)
-
-        # 영문 항목
-        new_text = re.sub(r'^[A-Za-z][\.\)]\s*', '', new_text)
-
-        # 특수기호
-        new_text = re.sub(r'^[\-\*\•\●\■\※\▶\▷\◆\◇]+\s*', '', new_text)
-
+        new_text = re.sub(r'^\d+([.\-]\d+)*[.\-]?\s*', '', new_text)    # 숫자 계층
+        new_text = re.sub(r'^\(?\d+\)\s*', '', new_text)    # 숫자 괄호
+        new_text = re.sub(r'^\[\d+\]\s*', '', new_text)    # 대괄호 숫자
+        new_text = re.sub(r'^[①②③④⑤⑥⑦⑧⑨⑩]+\s*', '', new_text)    # 원형 숫자
+        new_text = re.sub(r'^[가-힣][\.\)]\s*', '', new_text)    # 한글 항목
+        new_text = re.sub(r'^[A-Za-z][\.\)]\s*', '', new_text)    # 영문 항목
+        new_text = re.sub(r'^[\-\*\•\●\■\※\▶\▷\◆\◇]+\s*', '', new_text)    # 특수기호
         if new_text == text:
             break
 
@@ -176,7 +171,6 @@ def split_sentences(lines):
 # ========================================
 
 def extract_excel(file_path):
-
     output = []
 
     try:
@@ -189,29 +183,28 @@ def extract_excel(file_path):
         else:
             engine = "openpyxl"
 
-        xls = pd.ExcelFile(
-            file_path,
-            engine=engine
-        )
+        xls = pd.ExcelFile(file_path, engine=engine)
 
         for sheet in xls.sheet_names:
 
-            df = pd.read_excel(
-                xls,
-                sheet_name=sheet,
-                header=None,
-                dtype=str
-            )
+            df = pd.read_excel(xls, sheet_name=sheet, header=None, dtype=str)
 
             df = df.fillna("")
 
             for row in df.values:
 
-                row_text = " | ".join(
-                    str(cell).strip()
-                    for cell in row
-                    if str(cell).strip()
-                )
+                cells = []
+
+                for cell in row:
+
+                    cell = str(cell).strip()
+
+                    if not cell or cell == "nan":
+                        cell = "-"
+
+                    cells.append(cell)
+
+                row_text = " | ".join(cells)
 
                 if row_text:
                     output.append(row_text)
@@ -231,6 +224,7 @@ def extract_excel(file_path):
 
 def extract_pdf(file_path):
     full_text = []
+    table_lines = []
 
     try:
 
@@ -238,10 +232,31 @@ def extract_pdf(file_path):
 
             for page in pdf.pages:
 
-                text = page.extract_text()
+                # 1차: 표 영역 제외 후 텍스트 추출
+                text_page = page
+
+                try:
+                    tables = page.find_tables()
+
+                    for table in tables:
+                        bbox = table.bbox
+
+                        text_page = text_page.outside_bbox(bbox)        # 표 영역 제거
+
+                except Exception as e:
+
+                    print(f"[WARN] table bbox remove failed: {e}")
+
+                text = text_page.extract_text()
 
                 if text:
                     full_text.append(text)
+
+                # 2차: 표만 별도 추출
+                tables = extract_pdf_tables(page)
+
+                if tables:
+                    table_lines.extend(tables)
 
     except Exception as e:
 
@@ -249,7 +264,169 @@ def extract_pdf(file_path):
 
     combined_text = "\n".join(full_text)
 
-    return extract_by_chapter(combined_text)
+    text_length = len(combined_text.strip())
+
+    print(f"[PDF TEXT LENGTH] {text_length}")
+
+    # 3차: 텍스트형 PDF
+    if text_length > 100:
+        normal_lines = extract_by_chapter(combined_text)
+
+        return normal_lines, table_lines
+
+    # 4차: 이미지형 PDF → OCR
+    print("[INFO] OCR fallback")
+
+    ocr_lines, ocr_tables = extract_pdf_ocr(file_path)
+
+    return ocr_lines, ocr_tables
+
+# ========================================
+# ===== OCR =====
+# ========================================
+
+def extract_pdf_ocr(file_path):
+    normal_lines = []
+    table_lines = []
+
+    try:
+
+        pdf = fitz.open(file_path)
+
+        total_pages = len(pdf)
+
+        chunk_size = 15
+
+        print(f"[OCR] total pages = {total_pages}")
+
+        for start_page in range(0, total_pages, chunk_size):
+
+            end_page = min(start_page + chunk_size, total_pages)
+
+            print(f"[OCR CHUNK] {start_page + 1} ~ {end_page}")
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+
+                chunk_pdf = fitz.open()
+
+                for page_num in range(start_page, end_page):
+                    chunk_pdf.insert_pdf(
+                        pdf,
+                        from_page=page_num,
+                        to_page=page_num
+                    )
+
+                chunk_path = os.path.join(
+                    temp_dir,
+                    f"chunk_{start_page}.pdf"
+                )
+
+                chunk_pdf.save(chunk_path)
+                chunk_pdf.close()
+
+                # OCR 실행
+                opendataloader_pdf.convert(
+                    input_path=[chunk_path],
+                    output_dir=temp_dir,
+                    format=["json"],                  # ② markdown 제거
+                    hybrid="docling-fast",
+                    hybrid_url="http://127.0.0.1:5002",
+                    hybrid_mode="full"
+                )
+
+                json_files = [
+                    f for f in os.listdir(temp_dir)
+                    if f.endswith(".json")
+                ]
+
+                if not json_files:
+                    continue
+
+                json_path = os.path.join(temp_dir, json_files[0])
+
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                # ======================================
+                # 재귀 탐색
+                # ======================================
+
+                def walk(node):
+
+                    if isinstance(node, list):
+                        for child in node:
+                            walk(child)
+                        return
+
+                    if not isinstance(node, dict):
+                        return
+
+                    node_type = node.get("type")
+
+                    # 제목 / 문단
+                    if node_type in ("heading", "paragraph"):
+
+                        text = node.get("content", "").strip()
+
+                        if text:
+                            normal_lines.append(text)
+
+                    # 리스트
+                    elif node_type == "list":
+
+                        for item in node.get("list items", []):
+
+                            text = item.get("content", "").strip()
+
+                            if text:
+                                normal_lines.append(text)
+
+                    # 표
+                    elif node_type == "table":
+
+                        content = node.get("content", "")
+
+                        if content:
+
+                            for row in content.split("\n"):
+
+                                row = row.strip()
+
+                                if row:
+                                    table_lines.append(row)
+
+                    # 하위 kids 재귀 탐색
+                    if "kids" in node:
+                        walk(node["kids"])
+
+                    # list item 내부 kids
+                    if "list items" in node:
+                        for item in node["list items"]:
+                            if "kids" in item:
+                                walk(item["kids"])
+
+                walk(data)
+
+        pdf.close()
+
+        # ======================================
+        # 후처리
+        # ======================================
+
+        temp_text = "\n".join(normal_lines)
+
+        normal_lines = extract_by_chapter(temp_text)
+
+        print("[NORMAL LINES]", len(normal_lines))
+        print(normal_lines[:20])
+
+        return normal_lines, table_lines
+
+    except Exception as e:
+
+        print(f"[OCR ERROR] {file_path} / {e}")
+
+        return [], []
 
 
 # ========================================
@@ -258,25 +435,44 @@ def extract_pdf(file_path):
 
 def extract_hwp(file_path):
 
+    sentences = []
     try:
+        # 임시 PDF 경로 생성
+        hwp_path = Path(file_path)
+        pdf_path = hwp_path.with_suffix(".pdf")
 
-        parsed = parser.from_file(file_path)
+        # --------------------------
+        # HWP -> PDF
+        # --------------------------
+        hwp.Open(os.path.abspath(str(hwp_path)), "", "")
+        hwp.SaveAs(str(pdf_path), "PDF")
+        hwp.Clear(3)
 
-        text = parsed.get("content", "") or ""
+        # --------------------------
+        # PDF -> TXT
+        # --------------------------
+        normal_lines, table_lines = extract_pdf(str(pdf_path))
 
-        if not text.strip():
+        sentences = split_sentences(normal_lines)
+        sentences.extend(table_lines)
 
-            print(f"[WARN] No content extracted: {file_path}")
+        # 내용이 하나도 없는 경우(HWP 기준으로 경고 출력)
+        if not sentences:
+            print(f"[WARN] No content extracted from HWP: {file_path}")
 
-            return []
-
-        return extract_by_chapter(text)
 
     except Exception as e:
-
         print(f"[ERROR] HWP extraction failed: {file_path} / {e}")
 
-        return []
+    finally:
+        # 임시 PDF 삭제
+        if pdf_path.exists():
+            try:
+                pdf_path.unlink()
+            except Exception:
+                pass
+
+    return sentences
 
 
 # ========================================
@@ -380,6 +576,95 @@ def extract_hwpx(file_path):
     return filtered_lines, table_lines
 
 
+# ========================================
+# ===== ZIP처리 함수 =====
+# ========================================
+
+def extract_zip_recursive(zip_path):
+
+    extracted_files = []
+
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+
+        with zipfile.ZipFile(zip_path) as z:
+
+            z.extractall(temp_dir)
+
+        for root, _, files in os.walk(temp_dir):
+
+            for file in files:
+
+                path = os.path.join(root, file)
+
+                # ZIP이면 재귀
+                if file.lower().endswith(".zip"):
+
+                    if is_password_zip(path):
+                        print("[SKIP PASSWORD ZIP]", path)
+                        continue
+
+                    inner_files, _ = extract_zip_recursive(path)
+
+                    extracted_files.extend(inner_files)
+
+                else:
+
+                    extracted_files.append(path)
+
+        return extracted_files, temp_dir
+
+    except Exception as e:
+
+        print(f"[ZIP ERROR] {zip_path} / {e}")
+
+        return [], temp_dir
+
+# ========================================
+# ===== ZIP 내부 파일명 처리 =====
+# ========================================
+
+def make_zip_output_filename(zip_name, inner_path, extract_root):
+
+    # ZIP 내부 상대경로
+    rel_path = os.path.relpath(inner_path, extract_root)
+
+    # 확장자 제거
+    rel_path = os.path.splitext(rel_path)[0]
+
+    # 폴더 구분자를 _
+    rel_path = rel_path.replace("\\", "_")
+    rel_path = rel_path.replace("/", "_")
+
+    # ZIP 이름
+    zip_base = os.path.splitext(zip_name)[0]
+
+    return f"{zip_base}_{rel_path}.txt"
+
+
+# ========================================
+# ===== 암호 ZIP 제외 =====
+# ========================================
+
+def is_password_zip(path):
+
+    try:
+
+        with zipfile.ZipFile(path) as z:
+
+            for info in z.infolist():
+
+                if info.flag_bits & 0x1:
+                    return True
+
+        return False
+
+    except Exception:
+
+        return True
+
+
 ########################################
 # ===== 메인 처리 함수 =====
 ########################################
@@ -400,6 +685,12 @@ def process_file(data):
 
         ext = os.path.splitext(file_name)[1].lower()
         tmp_path = None
+        sentences = []
+
+        try:
+            hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
+        except Exception as e:
+            print("RegisterModule 실패 :", e)
 
         try:
 
@@ -413,15 +704,16 @@ def process_file(data):
                 f.write(r.content)
 
             if ext == ".pdf":
-                lines = extract_pdf(tmp_path)
-                sentences = split_sentences(lines)
+                normal_lines, table_lines = extract_pdf(tmp_path)
+
+                sentences = split_sentences(normal_lines)
+                sentences.extend(table_lines)
 
             elif ext in [".xls", ".xlsx"]:
                 sentences = extract_excel(tmp_path)
 
             elif ext == ".hwp":
-                lines = extract_hwp(tmp_path)
-                sentences = split_sentences(lines)
+                sentences = extract_hwp(tmp_path)
 
             elif ext == ".hwpx":
                 normal_lines, table_lines = extract_hwpx(tmp_path)
@@ -429,8 +721,57 @@ def process_file(data):
 
                 sentences.extend(table_lines)
 
+            elif ext == ".zip":
+
+                if is_password_zip(tmp_path):
+                    print("[SKIP PASSWORD ZIP]", file_name)
+                    continue
+
+                inner_files, extract_root = extract_zip_recursive(tmp_path)
+
+                try:
+                    for inner_path in inner_files:
+
+                        sentences = []
+
+                        inner_name = os.path.basename(inner_path)
+                        inner_ext = os.path.splitext(inner_name)[1].lower()
+
+                        if inner_ext == ".pdf":
+                            normal_lines, table_lines = extract_pdf(inner_path)
+                            sentences = split_sentences(normal_lines)
+                            sentences.extend(table_lines)
+
+                        elif inner_ext == ".hwp":
+                            sentences = extract_hwp(inner_path)
+
+                        elif inner_ext == ".hwpx":
+                            normal_lines, table_lines = extract_hwpx(inner_path)
+                            sentences = split_sentences(normal_lines)
+                            sentences.extend(table_lines)
+
+                        elif inner_ext in [".xls", ".xlsx"]:
+                            sentences = extract_excel(inner_path)
+
+                        else:
+                            continue
+
+                        results.append({
+                            "bidNtceNo": bid_id,
+                            "ntceSpecFileNm": inner_name,      # ZIP 내부 파일명
+                            "ntceSpecDocUrl": file_url,        # 원본 ZIP URL
+                            "sentences": sentences
+                        })
+
+                finally:
+                    shutil.rmtree(extract_root, ignore_errors=True)
+
+                continue
+
             else:
-                sentences = []
+
+                print(f"[SKIP] Unsupported: {file_name}")
+                continue
 
 
             results.append({
