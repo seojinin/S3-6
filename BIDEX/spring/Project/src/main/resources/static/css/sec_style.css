@@ -1424,3 +1424,52 @@ td {
     cursor: pointer;
     font-size: 14px;
 }
+
+/* ===== 입찰공고 테이블 컬럼 너비 ===== */
+
+#bidTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#bidTable th,
+#bidTable td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#bidTable th:nth-child(1),
+#bidTable td:nth-child(1) {
+    width: 70px;
+}
+
+#bidTable th:nth-child(2),
+#bidTable td:nth-child(2) {
+    width: 420px;
+}
+
+#bidTable th:nth-child(3),
+#bidTable td:nth-child(3) {
+    width: 120px;
+}
+
+#bidTable th:nth-child(4),
+#bidTable td:nth-child(4) {
+    width: 90px;
+}
+
+#bidTable th:nth-child(5),
+#bidTable td:nth-child(5) {
+    width: 150px;
+}
+
+#bidTable th:nth-child(6),
+#bidTable td:nth-child(6) {
+    width: 250px;
+}
+
+#bidTable th:nth-child(7),
+#bidTable td:nth-child(7) {
+    width: 120px;
+}
