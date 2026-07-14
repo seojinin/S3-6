@@ -14,11 +14,8 @@
 		</foreach>
 	</insert>
 
-	<!-- 공고 ID로 조회 -->
-	
-	<!-- 키워드 검색 -->
-	<!-- 공고명(제목) 또는 NER 엔티티 값으로 통합 검색 -->
-	<select id=id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
+	<!-- 공고 ID로 조회 (상세페이지 AI 리포트용, 회원별 키워드 매칭 여부 포함) -->
+	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
 		SELECT
     e.entity_id,
     n.notice_number,

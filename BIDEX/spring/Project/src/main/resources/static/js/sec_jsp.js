@@ -169,6 +169,9 @@ window.addEventListener('DOMContentLoaded', () => {
     // (드롭다운/마이페이지 알림탭이 열려있으면 전체 목록을, 아니면 뱃지 숫자만)
     setInterval(pollNotifications, 4000);
 });
+window.addEventListener('load', () => {
+    window.scrollTo(0, 0);
+});
 
 // 새로고침 시 현재 URL 해시를 읽어서 그 페이지를 복원 (없으면 메인으로)
 function restoreInitialPage() {
@@ -817,14 +820,12 @@ function showKeywordInputBox() { document.getElementById('mypageKeywordInput').f
 let popupKeyword = '';
 
 function openKeywordPopup(val) {
-    if (!val || val.trim() === '') return;
-    popupKeyword = val.trim();
+    popupKeyword = (val || '').trim();
     document.getElementById('keywordPopupInput').value = popupKeyword;
     renderPopupTag(popupKeyword);
     document.getElementById('keywordPopup').classList.add('show');
     document.getElementById('keywordPopupInput').focus();
 }
-
 function closeKeywordPopup() {
     document.getElementById('keywordPopup').classList.remove('show');
     document.getElementById('mypageKeywordInput').value = '';
