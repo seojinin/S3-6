@@ -240,9 +240,9 @@ def fill_merged_cells(table):
 # ========================================
 # ===== pdf 표 추출 =====
 # ========================================
-def extract_pdf_tables(page):
+def extract_pdf_tables(page, start_id):
     lines = []
-    num = 1
+    num = start_id
 
     try:
 
@@ -284,7 +284,7 @@ def extract_pdf_tables(page):
 
         print(f"[WARN] table extraction failed: {e}")
 
-    return lines
+    return lines, num
 
 
 # ========================================
@@ -353,6 +353,8 @@ def extract_pdf(file_path):
 
         with pdfplumber.open(file_path) as pdf:
 
+            next_id = 1
+
             for page in pdf.pages:
 
                 # 1차: 표 영역 제외 후 텍스트 추출
@@ -376,7 +378,7 @@ def extract_pdf(file_path):
                     full_text.append(text)
 
                 # 2차: 표만 별도 추출
-                tables = extract_pdf_tables(page)
+                tables,next_id = extract_pdf_tables(page,next_id)
 
                 if tables:
                     table_lines.extend(tables)
