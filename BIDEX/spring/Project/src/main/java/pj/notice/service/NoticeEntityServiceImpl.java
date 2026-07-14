@@ -108,19 +108,14 @@ public class NoticeEntityServiceImpl implements NoticeEntityServiceIF {
 	}
     }
 
-    //@Override
-    //public List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber) {
-	//return entityMapper.selectByNoticeNumber(noticeNumber);
-    //}
+//    @Override
+//    public List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber) {
+//	return entityMapper.selectByNoticeNumber(noticeNumber);
+//    }
+
     @Override
-    public List<NoticeEntityModel> getEntitiesByNoticeNumber(
-            String noticeNumber,
-            Long memberId) {
-
-        return entityMapper.selectByNoticeNumber(
-                noticeNumber,
-                memberId);
-
+    public List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber, Long memberId) {
+	return entityMapper.selectByNoticeNumber(noticeNumber, memberId);
     }
 
     @Override

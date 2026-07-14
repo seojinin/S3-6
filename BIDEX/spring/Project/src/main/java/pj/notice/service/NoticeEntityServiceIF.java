@@ -11,10 +11,9 @@ public interface NoticeEntityServiceIF {
 
     List<NoticeEntityModel> searchByKeyword(String keyword);
 
-   // List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber);
-    List<NoticeEntityModel> getEntitiesByNoticeNumber(
-            String noticeNumber,
-            Long memberId);
+    // List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber);
+    List<NoticeEntityModel> getEntitiesByNoticeNumber(String noticeNumber, Long memberId);
+
     List<NoticeEntityModel> searchByKeywords(List<String> keywords);
 
 }
