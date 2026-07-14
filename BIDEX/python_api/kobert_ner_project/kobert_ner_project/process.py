@@ -799,8 +799,14 @@ def is_password_zip(path):
 
 def process_file(data):
     results = []
+    skipped_files = []
 
     files = data.get("files", [])
+
+    try:
+        hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
+    except Exception as e:
+        print("RegisterModule 실패 :", e)
 
     for file in files:
 
@@ -809,16 +815,17 @@ def process_file(data):
         file_url = file.get("fileUrl")
 
         if not file_name or not file_url:
+            skipped_files.append({
+                "bidNtceNo": bid_id,
+                "fileName": file_name or "(이름없음)",
+                "fileUrl": file_url,
+                "reason": "fileName 또는 fileUrl 누락"
+            })
             continue
 
         ext = os.path.splitext(file_name)[1].lower()
         tmp_path = None
         sentences = []
-
-        try:
-            hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-        except Exception as e:
-            print("RegisterModule 실패 :", e)
 
         try:
 
@@ -835,6 +842,12 @@ def process_file(data):
 
                 if not is_target_doc(file_name):
                     print(f"[SKIP] Not target document : {file_name}")
+                    skipped_files.append({
+                        "bidNtceNo": bid_id,
+                        "fileName": file_name,
+                        "fileUrl": file_url,
+                        "reason": "대상 문서명 아님(시방서/제안요청서/과업지시서 아님)"
+                    })
                     continue
 
             if ext == ".pdf":
@@ -862,7 +875,11 @@ def process_file(data):
             elif ext == ".zip":
 
                 if is_password_zip(tmp_path):
-                    print("[SKIP PASSWORD ZIP]", file_name)
+                    skipped_files.append({
+                        "bidNtceNo": bid_id,
+                        "fileName": file_name,
+                        "fileUrl": file_url,
+                        "reason": "비밀번호 걸린 ZIP"})
                     continue
 
                 inner_files, extract_root = extract_zip_recursive(tmp_path)
@@ -870,7 +887,7 @@ def process_file(data):
                 try:
                     for inner_path in inner_files:
 
-                        sentences = []
+                        inner_sentences = []
 
                         inner_name = os.path.basename(inner_path)
                         inner_ext = os.path.splitext(inner_name)[1].lower()
@@ -879,36 +896,47 @@ def process_file(data):
 
                             if not is_target_doc(inner_name):
                                 print(f"[ZIP SKIP] {inner_name}")
+                                skipped_files.append({
+                                    "bidNtceNo": bid_id,
+                                    "fileName": inner_name,
+                                    "fileUrl": file_url,
+                                    "reason": "대상 문서명 아님(시방서/제안요청서/과업지시서 아님)"
+                                })
                                 continue
 
                         if inner_ext == ".pdf":
                             normal_lines, table_lines = extract_pdf(inner_path)
                             start_id = len(table_lines) + 1
                             normal_lines = split_sentences(normal_lines, start_id)
-                            sentences = table_lines.copy()
-                            sentences.extend(normal_lines)
+                            inner_sentences = table_lines.copy()
+                            inner_sentences.extend(normal_lines)
 
                         elif inner_ext == ".hwp":
-                            sentences = extract_hwp(inner_path)
+                            inner_sentences = extract_hwp(inner_path)
 
                         elif inner_ext == ".hwpx":
                             normal_lines, table_lines = extract_hwpx(inner_path)
                             start_id = len(table_lines) + 1
                             normal_lines = split_sentences(normal_lines, start_id)
-                            sentences = table_lines.copy()
-                            sentences.extend(normal_lines)
+                            inner_sentences = table_lines.copy()
+                            inner_sentences.extend(normal_lines)
 
                         elif inner_ext in [".xls", ".xlsx"]:
-                            sentences = extract_excel(inner_path)
+                            inner_sentences = extract_excel(inner_path)
 
                         else:
+                            skipped_files.append({
+                                "bidNtceNo": bid_id,
+                                "fileName": inner_name,
+                                "fileUrl": file_url,
+                                "reason": f"ZIP 내부 미지원 확장자({inner_ext})"})
                             continue
 
                         results.append({
                             "bidNtceNo": bid_id,
                             "ntceSpecFileNm": inner_name,      # ZIP 내부 파일명
                             "ntceSpecDocUrl": file_url,        # 원본 ZIP URL
-                            "sentences": sentences
+                            "sentences": inner_sentences
                         })
 
                 finally:
@@ -917,8 +945,11 @@ def process_file(data):
                 continue
 
             else:
-
-                print(f"[SKIP] Unsupported: {file_name}")
+                skipped_files.append({
+                    "bidNtceNo": bid_id,
+                    "fileName": file_name,
+                    "fileUrl": file_url,
+                    "reason": f"지원하지 않는 확장자({ext})"})
                 continue
 
 
@@ -929,6 +960,14 @@ def process_file(data):
                 "sentences": sentences
             })
 
+        except Exception as e:
+            print(f"[ERROR] 파일 처리 실패: {file_name} / {e}")
+            skipped_files.append({
+                "bidNtceNo": bid_id,
+                "fileName": file_name,
+                "fileUrl": file_url,
+                "reason": f"처리 중 오류: {e}"})
+
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 try:
@@ -936,4 +975,4 @@ def process_file(data):
                 except PermissionError:
                     pass
 
-    return results
+    return results, skipped_files
