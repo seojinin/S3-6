@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import pj.notice.dto.FileInfoDto;
+import pj.notice.mapper.NoticeEntityMapper;
 import pj.notice.mapper.NoticeMapper;
 import pj.notice.model.NoticeModel;
 
@@ -24,6 +25,12 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
     @Autowired
     private NoticeMapper noticeMapper;
+
+    @Autowired
+    private NoticeEntityMapper noticeEntityMapper;
+
+    @Autowired
+    private NotificationIF notificationIF;
 
     private RestTemplate restTemplate = new RestTemplate();
 
@@ -35,7 +42,7 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
 	LocalDate today = LocalDate.now();
 
-	String begin = today.minusDays(5).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+	String begin = today.minusDays(10).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
 	String end = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
@@ -143,6 +150,9 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
 	    if (result > 0) {
 
+		// 공고 제목으로 관심 키워드 알림 생성
+		checkKeywordMatchAndNotify(notice);
+
 		for (int i = 1; i <= 10; i++) {
 
 		    String fileName = node.path("ntceSpecFileNm" + i).asText();
@@ -176,37 +186,49 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
     }
 
     // 신규 공고 제목에 등록된 키워드가 포함되어 있으면, 그 키워드를 등록한 회원에게 알림 생성
-//    private void checkKeywordMatchAndNotify(NoticeModel notice) {
-//
-//	try {
-//	    String title = notice.getNoticeTitle();
-//	    if (title == null || title.isEmpty()) {
-//		return;
-//	    }
-//
-//	    List<Map<String, Object>> keywords = noticeEntityMapper.selectAllKeywords();
-//
-//	    for (Map<String, Object> row : keywords) {
-//
-//		Object idObj = row.get("keyword_id");
-//		Object wordObj = row.get("standard_word");
-//
-//		if (idObj == null || wordObj == null) {
-//		    continue;
-//		}
-//
-//		Long keywordId = ((Number) idObj).longValue();
-//		String word = wordObj.toString();
-//
-//		if (!word.isEmpty() && title.contains(word)) {
-//		    notificationIF.createKeywordNotifications(keywordId, word, notice.getNoticeNumber());
-//		}
-//	    }
-//
-//	} catch (Exception e) {
-//	    e.printStackTrace();
-//	}
-//    }
+    private void checkKeywordMatchAndNotify(NoticeModel notice) {
+
+	try {
+
+	    String title = notice.getNoticeTitle();
+
+	    if (title == null || title.trim().isEmpty()) {
+		return;
+	    }
+
+	    // 제목도 키워드와 동일한 방식으로 정규화
+	    String normalizedTitle = title.replaceAll("\\s+", "").toLowerCase();
+
+	    List<Map<String, Object>> keywords = noticeEntityMapper.selectAllKeywords();
+
+	    for (Map<String, Object> row : keywords) {
+
+		Object idObj = row.get("keyword_id");
+		Object wordObj = row.get("standard_word");
+
+		if (idObj == null || wordObj == null) {
+		    continue;
+		}
+
+		Long keywordId = ((Number) idObj).longValue();
+		String word = wordObj.toString();
+
+		if (word == null || word.trim().isEmpty()) {
+		    continue;
+		}
+
+		if (normalizedTitle.contains(word)) {
+
+		    notificationIF.createKeywordNotifications(keywordId, word, notice.getNoticeNumber());
+
+		    System.out.println("제목 키워드 알림 생성 : " + word + " / " + notice.getNoticeNumber());
+		}
+	    }
+
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
+    }
 
     private List<FileInfoDto> extractFilesFromNotice(JsonNode node) {
 

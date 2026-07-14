@@ -10,8 +10,7 @@
 		VALUES (#{memberId}, #{noticeNumber}, #{message})
 	</insert>
 
-	<select id="selectByMemberId"
-		resultType="pj.notice.model.NotificationModel">
+	<select id="selectByMemberId" resultType="pj.notice.model.NotificationModel">
 		SELECT
 			nt.notification_id,
 			nt.member_id,

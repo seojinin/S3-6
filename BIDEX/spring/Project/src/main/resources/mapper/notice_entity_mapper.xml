@@ -14,6 +14,7 @@
 		</foreach>
 	</insert>
 
+<<<<<<< HEAD
 	<!-- 공고 ID로 조회 (상세페이지 AI 리포트용, 회원별 키워드 매칭 여부 포함) -->
 	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
 		SELECT
@@ -24,29 +25,56 @@
     e.file_name,
     n.notice_title,
     e.file_url,
+=======
+	<!-- 공고 ID로 조회 -->
+	<select id="selectByNoticeNumber"
+		resultType="pj.notice.model.NoticeEntityModel">
+		SELECT
+			e.entity_id,
+			n.notice_number,
+			e.entity_value,
+			e.entity_type,
+			e.file_name,
+			n.notice_title,
+			e.file_url,
 
-    CASE
-        WHEN mk.keyword_id IS NOT NULL THEN TRUE
-        ELSE FALSE
-    END AS matched
+		CASE
+		WHEN mk.keyword_id IS NOT NULL THEN TRUE
+		ELSE FALSE
+		END AS matched
 
-FROM tb_notice_entity e
+		FROM tb_notice_entity e
 
-JOIN tb_notice n
-    ON e.notice_number = n.notice_number
+		JOIN tb_notice n ON e.notice_number = n.notice_number
 
-LEFT JOIN tb_keyword k
-    ON LOWER(k.standard_word) = LOWER(e.entity_value)
+		LEFT JOIN tb_keyword k ON LOWER(k.standard_word) = LOWER(e.entity_value)
 
-LEFT JOIN tb_member_keyword mk
-    ON mk.keyword_id = k.keyword_id
-   AND mk.member_id = #{memberId}
+		LEFT JOIN tb_member_keyword mk ON mk.keyword_id = k.keyword_id
+		AND mk.member_id = #{memberId}
 
-WHERE e.notice_number = #{noticeNumber}
+		WHERE e.notice_number = #{noticeNumber}
 
-ORDER BY e.file_name
-
+		ORDER BY e.file_name
 	</select>
+
+	<!-- 키워드 검색 -->
+	<!-- 공고명(제목) 또는 NER 엔티티 값으로 통합 검색 -->
+<!-- 	<select id="searchByKeyword" resultType="pj.notice.model.NoticeEntityModel">
+		SELECT DISTINCT
+			e.entity_id,
+			n.notice_number,
+			e.entity_value,
+			e.entity_type,
+			e.file_name,
+			n.notice_title,
+			e.file_url
+		FROM tb_notice n
+		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
+		WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%')
+		OR e.entity_value LIKE CONCAT('%', #{keyword}, '%')
+>>>>>>> 776b62fc2262bca80705168da3a2f45575323412
+
+	</select> -->
 
 	<!-- 다중 키워드 검색 -->
 	<select id="searchByKeywords" resultType="pj.notice.model.NoticeEntityModel">
@@ -101,7 +129,7 @@ ORDER BY e.file_name
 
 	<!-- 신규 공고 저장 시, 제목과 실시간으로 매칭할 전체 등록 키워드 목록 -->
 	<select id="selectAllKeywords" resultType="map">
-		SELECT keyword_id AS keyword_id, standard_word AS standard_word
+		SELECT keyword_id, standard_word
 		FROM tb_keyword
 	</select>
 

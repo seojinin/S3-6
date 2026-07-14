@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,13 +12,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.security.core.Authentication;
-import pj.security.CustomUserDetails;
 
 import pj.notice.dto.NoticeEntityBulkRequest;
 import pj.notice.dto.NoticeEntityDto;
 import pj.notice.model.NoticeEntityModel;
 import pj.notice.service.NoticeEntityServiceIF;
+import pj.security.CustomUserDetails;
 
 @RestController
 @RequestMapping("/api/notices")
@@ -37,32 +37,29 @@ public class NoticeEntityController {
 	service.saveBulk(request);
 
 	return "saved";
+
     }
 
     // 특정 공고의 엔티티 조회
-    //@GetMapping("/{noticeNumber}/entities")
-    //public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber) {
-
+//     @GetMapping("/{noticeNumber}/entities")
+//     public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber)
+//     {
 //	return service.getEntitiesByNoticeNumber(noticeNumber);
- //   }
-    
+//     }
 
     @GetMapping("/{noticeNumber}/entities")
-    public List<NoticeEntityModel> getEntities(
-            @PathVariable String noticeNumber,
-            Authentication authentication) {
+    public List<NoticeEntityModel> getEntities(@PathVariable String noticeNumber, Authentication authentication) {
 
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return List.of();
-        }
+	if (authentication == null || !authentication.isAuthenticated()) {
+	    return List.of();
+	}
 
-        CustomUserDetails user =
-                (CustomUserDetails) authentication.getPrincipal();
+	CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
 
-        return service.getEntitiesByNoticeNumber(
-                noticeNumber,
-                user.getMemberId());
+	return service.getEntitiesByNoticeNumber(noticeNumber, user.getMemberId());
+
     }
+
 //	@GetMapping("/entities/search")
 //	public List<NoticeEntityModel> search(@RequestParam String keyword) {
 //		return service.searchByKeyword(keyword);
@@ -71,13 +68,10 @@ public class NoticeEntityController {
     @GetMapping("/entities/search")
     public List<NoticeEntityModel> search(@RequestParam String keyword) {
 
-	List<String> keywords = Arrays
-		.stream(keyword.split("/"))
-		.map(String::trim)
-		.filter(s -> !s.isEmpty())
-		.toList();
+	List<String> keywords = Arrays.stream(keyword.split("/")).map(String::trim).filter(s -> !s.isEmpty()).toList();
 
 	return service.searchByKeywords(keywords);
+
     }
 
 }

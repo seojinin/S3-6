@@ -22,8 +22,26 @@ hwp = win32com.client.gencache.EnsureDispatch("HWPFrame.HwpObject")
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 
+ATTACHMENT_NAME_PATTERNS = [
+    r"시\s*방\s*서",
+    r"제\s*안\s*요\s*청\s*서",
+    r"과\s*업\s*지\s*시\s*서",
+]
+
 KEEP_TITLE_KEYWORDS = ["자재", "재료", "제품", "기구", "기기", "부속품"]
 KEYWORD_MATCH_MODE = "OR"
+
+
+########################################
+# ===== 첨부파일 필터 =====
+########################################
+
+def is_target_doc(file_name):
+    return any(
+        re.search(pattern, file_name)
+        for pattern in ATTACHMENT_NAME_PATTERNS
+    )
+
 
 ########################################
 # ===== 챕터 제목 패턴 =====
@@ -46,7 +64,7 @@ def clean_start(text):
     text = text.strip()
 
     while True:
-                new_text = text
+        new_text = text
 
         new_text = re.sub(r'^\d+([.\-]\d+)*[.\-]?\s*', '', new_text)    # 숫자 계층
         new_text = re.sub(r'^\(?\d+\)\s*', '', new_text)    # 숫자 괄호
@@ -132,9 +150,8 @@ def extract_by_chapter(text: str):
 # ===== 문장 분리 =====
 ########################################
 
-def split_sentences(lines):
+def split_sentences(lines, start_id):
     sentences = []
-    num = 1
 
     lines = merge_lines(lines)
 
@@ -157,13 +174,117 @@ def split_sentences(lines):
                 continue
 
             sentences.append({
-                "sentenceId": num,
+                "sentenceId": start_id,
                 "sentence": p
             })
 
-            num += 1
+            start_id += 1
 
     return sentences
+
+
+# ========================================
+# ===== 표 병합 셀 처리 =====
+# ========================================
+
+def fill_merged_cells(table):
+    if not table:
+        return table
+
+    max_cols = max(len(row) for row in table)
+
+    normalized = []
+
+    for row in table:
+
+        row = list(row)
+
+        while len(row) < max_cols:
+            row.append(None)
+
+        normalized.append(row)
+
+    for r in range(len(normalized)):
+
+        for c in range(max_cols):
+
+            val = normalized[r][c]
+
+            if val is None or str(val).strip() == "":
+
+                if r > 0:
+
+                    upper = normalized[r - 1][c]
+
+                    if upper not in [None, ""]:
+                        normalized[r][c] = upper
+
+    for r in range(len(normalized)):
+
+        for c in range(max_cols):
+
+            val = normalized[r][c]
+
+            if val is None or str(val).strip() == "":
+
+                if c > 0:
+
+                    left = normalized[r][c - 1]
+
+                    if left not in [None, ""]:
+                        normalized[r][c] = left
+
+    return normalized
+
+
+# ========================================
+# ===== pdf 표 추출 =====
+# ========================================
+def extract_pdf_tables(page, start_id):
+    lines = []
+    num = start_id
+
+    try:
+
+        tables = page.extract_tables()
+
+        for table in tables:
+
+            if not table:
+                continue
+
+            table = fill_merged_cells(table)
+
+            for row in table:
+
+                cells = []
+
+                for cell in row:
+
+                    # 공백 셀
+                    if cell is None:
+                        cell = "-"
+
+                    cell = str(cell).strip()
+
+                    if not cell:
+                        cell = "-"
+
+                    # 줄바꿈 제거
+                    cell = re.sub(r"\s+", " ", cell)
+
+                    cells.append(cell)
+
+                row_text = " | ".join(cells)
+
+                lines.append({"sentenceId": num, "sentence": row_text})
+                num += 1
+
+    except Exception as e:
+
+        print(f"[WARN] table extraction failed: {e}")
+
+    return lines, num
 
 
 # ========================================
@@ -172,6 +293,7 @@ def split_sentences(lines):
 
 def extract_excel(file_path):
     output = []
+    num = 1
 
     try:
 
@@ -207,7 +329,8 @@ def extract_excel(file_path):
                 row_text = " | ".join(cells)
 
                 if row_text:
-                    output.append(row_text)
+                    output.append({"sentenceId": num, "sentence": row_text})
+                    num += 1
 
         print(f"[EXCEL] extracted rows: {len(output)}")
 
@@ -229,6 +352,8 @@ def extract_pdf(file_path):
     try:
 
         with pdfplumber.open(file_path) as pdf:
+
+            next_id = 1
 
             for page in pdf.pages:
 
@@ -253,7 +378,7 @@ def extract_pdf(file_path):
                     full_text.append(text)
 
                 # 2차: 표만 별도 추출
-                tables = extract_pdf_tables(page)
+                tables,next_id = extract_pdf_tables(page,next_id)
 
                 if tables:
                     table_lines.extend(tables)
@@ -453,8 +578,10 @@ def extract_hwp(file_path):
         # --------------------------
         normal_lines, table_lines = extract_pdf(str(pdf_path))
 
-        sentences = split_sentences(normal_lines)
-        sentences.extend(table_lines)
+        start_id = len(table_lines) + 1
+        normal_lines = split_sentences(normal_lines, start_id)
+        sentences = table_lines.copy()
+        sentences.extend(normal_lines)
 
         # 내용이 하나도 없는 경우(HWP 기준으로 경고 출력)
         if not sentences:
@@ -483,7 +610,7 @@ def extract_hwpx(file_path):
 
     normal_lines = []
     table_lines = []
-
+    num = 1
     try:
 
         with zipfile.ZipFile(file_path, 'r') as z:
@@ -561,7 +688,8 @@ def extract_hwpx(file_path):
                                 # 표는 그대로 유지
                                 row_sentence = " | ".join(cell_texts)
 
-                                table_lines.append(row_sentence)
+                                table_lines.append({"sentenceId": num, "sentence": row_sentence})
+                                num += 1
 
     except Exception as e:
 
@@ -671,8 +799,14 @@ def is_password_zip(path):
 
 def process_file(data):
     results = []
+    skipped_files = []
 
     files = data.get("files", [])
+
+    try:
+        hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
+    except Exception as e:
+        print("RegisterModule 실패 :", e)
 
     for file in files:
 
@@ -681,6 +815,12 @@ def process_file(data):
         file_url = file.get("fileUrl")
 
         if not file_name or not file_url:
+            skipped_files.append({
+                "bidNtceNo": bid_id,
+                "fileName": file_name or "(이름없음)",
+                "fileUrl": file_url,
+                "reason": "fileName 또는 fileUrl 누락"
+            })
             continue
 
         ext = os.path.splitext(file_name)[1].lower()
@@ -688,26 +828,35 @@ def process_file(data):
         sentences = []
 
         try:
-            hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-        except Exception as e:
-            print("RegisterModule 실패 :", e)
-
-        try:
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                 tmp_path = tmp.name
 
-            r = requests.get(file_url, timeout=30)
+            r = requests.get(file_url, timeout=120)
             r.raise_for_status()
 
             with open(tmp_path, "wb") as f:
                 f.write(r.content)
 
+            if ext in [".pdf", ".hwp", ".hwpx"]:
+
+                if not is_target_doc(file_name):
+                    print(f"[SKIP] Not target document : {file_name}")
+                    skipped_files.append({
+                        "bidNtceNo": bid_id,
+                        "fileName": file_name,
+                        "fileUrl": file_url,
+                        "reason": "대상 문서명 아님(시방서/제안요청서/과업지시서 아님)"
+                    })
+                    continue
+
             if ext == ".pdf":
                 normal_lines, table_lines = extract_pdf(tmp_path)
 
-                sentences = split_sentences(normal_lines)
-                sentences.extend(table_lines)
+                start_id = len(table_lines) +1
+                normal_lines = split_sentences(normal_lines,start_id)
+                sentences = table_lines.copy()
+                sentences.extend(normal_lines)
 
             elif ext in [".xls", ".xlsx"]:
                 sentences = extract_excel(tmp_path)
@@ -717,14 +866,20 @@ def process_file(data):
 
             elif ext == ".hwpx":
                 normal_lines, table_lines = extract_hwpx(tmp_path)
-                sentences = split_sentences(normal_lines)
-
-                sentences.extend(table_lines)
+                
+                start_id = len(table_lines) +1
+                normal_lines = split_sentences(normal_lines,start_id)
+                sentences = table_lines.copy()
+                sentences.extend(normal_lines)
 
             elif ext == ".zip":
 
                 if is_password_zip(tmp_path):
-                    print("[SKIP PASSWORD ZIP]", file_name)
+                    skipped_files.append({
+                        "bidNtceNo": bid_id,
+                        "fileName": file_name,
+                        "fileUrl": file_url,
+                        "reason": "비밀번호 걸린 ZIP"})
                     continue
 
                 inner_files, extract_root = extract_zip_recursive(tmp_path)
@@ -732,35 +887,56 @@ def process_file(data):
                 try:
                     for inner_path in inner_files:
 
-                        sentences = []
+                        inner_sentences = []
 
                         inner_name = os.path.basename(inner_path)
                         inner_ext = os.path.splitext(inner_name)[1].lower()
 
+                        if inner_ext in [".pdf", ".hwp", ".hwpx"]:
+
+                            if not is_target_doc(inner_name):
+                                print(f"[ZIP SKIP] {inner_name}")
+                                skipped_files.append({
+                                    "bidNtceNo": bid_id,
+                                    "fileName": inner_name,
+                                    "fileUrl": file_url,
+                                    "reason": "대상 문서명 아님(시방서/제안요청서/과업지시서 아님)"
+                                })
+                                continue
+
                         if inner_ext == ".pdf":
                             normal_lines, table_lines = extract_pdf(inner_path)
-                            sentences = split_sentences(normal_lines)
-                            sentences.extend(table_lines)
+                            start_id = len(table_lines) + 1
+                            normal_lines = split_sentences(normal_lines, start_id)
+                            inner_sentences = table_lines.copy()
+                            inner_sentences.extend(normal_lines)
 
                         elif inner_ext == ".hwp":
-                            sentences = extract_hwp(inner_path)
+                            inner_sentences = extract_hwp(inner_path)
 
                         elif inner_ext == ".hwpx":
                             normal_lines, table_lines = extract_hwpx(inner_path)
-                            sentences = split_sentences(normal_lines)
-                            sentences.extend(table_lines)
+                            start_id = len(table_lines) + 1
+                            normal_lines = split_sentences(normal_lines, start_id)
+                            inner_sentences = table_lines.copy()
+                            inner_sentences.extend(normal_lines)
 
                         elif inner_ext in [".xls", ".xlsx"]:
-                            sentences = extract_excel(inner_path)
+                            inner_sentences = extract_excel(inner_path)
 
                         else:
+                            skipped_files.append({
+                                "bidNtceNo": bid_id,
+                                "fileName": inner_name,
+                                "fileUrl": file_url,
+                                "reason": f"ZIP 내부 미지원 확장자({inner_ext})"})
                             continue
 
                         results.append({
                             "bidNtceNo": bid_id,
                             "ntceSpecFileNm": inner_name,      # ZIP 내부 파일명
                             "ntceSpecDocUrl": file_url,        # 원본 ZIP URL
-                            "sentences": sentences
+                            "sentences": inner_sentences
                         })
 
                 finally:
@@ -769,8 +945,11 @@ def process_file(data):
                 continue
 
             else:
-
-                print(f"[SKIP] Unsupported: {file_name}")
+                skipped_files.append({
+                    "bidNtceNo": bid_id,
+                    "fileName": file_name,
+                    "fileUrl": file_url,
+                    "reason": f"지원하지 않는 확장자({ext})"})
                 continue
 
 
@@ -781,6 +960,14 @@ def process_file(data):
                 "sentences": sentences
             })
 
+        except Exception as e:
+            print(f"[ERROR] 파일 처리 실패: {file_name} / {e}")
+            skipped_files.append({
+                "bidNtceNo": bid_id,
+                "fileName": file_name,
+                "fileUrl": file_url,
+                "reason": f"처리 중 오류: {e}"})
+
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 try:
@@ -788,4 +975,4 @@ def process_file(data):
                 except PermissionError:
                     pass
 
-    return results
+    return results, skipped_files

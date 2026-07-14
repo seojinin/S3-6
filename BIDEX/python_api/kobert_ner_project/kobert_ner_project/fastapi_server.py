@@ -39,6 +39,49 @@ def process_bid(data: dict):
         for sf in skipped_files:
             print(f" - {sf['fileName']} ({sf['reason']})")
 
+    # ==== 스킵된 파일 재시도 대상 필터링 ====
+    # 재시도 적합성 검사
+    retryable = [
+        sf for sf in skipped_files
+        if sf.get("fileUrl") and "누락" not in sf["reason"] and "지원하지 않는" not in sf["reason"]
+    ]
+
+    if retryable:
+        print(f"[재시도] {len(retryable)}개 파일 재처리 시도")
+
+        retry_data = {
+            "files": [
+                {
+                    "bidNtceNo": sf["bidNtceNo"],
+                    "fileName": sf["fileName"],
+                    "fileUrl": sf["fileUrl"]
+                }
+                for sf in retryable
+            ]
+        }
+
+        t_retry_1 = time.time()
+        retry_result, retry_skipped = process_file(retry_data)
+        t_retry_2 = time.time()
+
+        print(f"[재시도] 시간: {t_retry_2 - t_retry_1:.4f}초")
+        print(f"[재시도] 성공: {len(retry_result)} / 재실패: {len(retry_skipped)}")
+
+        # 재시도 성공분 processed_result에 추가
+        processed_result.extend(retry_result)
+
+        # 최종 스킵 목록 = (재시도 대상 아닌 것) + (재실패)
+        non_retryable = [sf for sf in skipped_files if sf not in retryable]
+        skipped_files = non_retryable + retry_skipped
+
+        print(f"[정보] 재시도 후 최종 스킵 파일 수: {len(skipped_files)}")
+
+    # 재시도 이후 최종 스킵된 파일 목록 출력
+    if skipped_files:
+        print("[재시도 후 최종 스킵 목록]")
+        for sf in skipped_files:
+            print(f" - {sf['fileName']} ({sf['reason']})")
+
     ner_results = []
 
     for idx, file_result in enumerate(processed_result, start=1):
