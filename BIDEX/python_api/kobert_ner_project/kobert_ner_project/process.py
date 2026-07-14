@@ -46,7 +46,7 @@ def clean_start(text):
     text = text.strip()
 
     while True:
-                new_text = text
+        new_text = text
 
         new_text = re.sub(r'^\d+([.\-]\d+)*[.\-]?\s*', '', new_text)    # 숫자 계층
         new_text = re.sub(r'^\(?\d+\)\s*', '', new_text)    # 숫자 괄호
@@ -132,9 +132,8 @@ def extract_by_chapter(text: str):
 # ===== 문장 분리 =====
 ########################################
 
-def split_sentences(lines):
+def split_sentences(lines, start_id):
     sentences = []
-    num = 1
 
     lines = merge_lines(lines)
 
@@ -157,13 +156,117 @@ def split_sentences(lines):
                 continue
 
             sentences.append({
-                "sentenceId": num,
+                "sentenceId": start_id,
                 "sentence": p
             })
 
-            num += 1
+            start_id += 1
 
     return sentences
+
+
+# ========================================
+# ===== 표 병합 셀 처리 =====
+# ========================================
+
+def fill_merged_cells(table):
+    if not table:
+        return table
+
+    max_cols = max(len(row) for row in table)
+
+    normalized = []
+
+    for row in table:
+
+        row = list(row)
+
+        while len(row) < max_cols:
+            row.append(None)
+
+        normalized.append(row)
+
+    for r in range(len(normalized)):
+
+        for c in range(max_cols):
+
+            val = normalized[r][c]
+
+            if val is None or str(val).strip() == "":
+
+                if r > 0:
+
+                    upper = normalized[r - 1][c]
+
+                    if upper not in [None, ""]:
+                        normalized[r][c] = upper
+
+    for r in range(len(normalized)):
+
+        for c in range(max_cols):
+
+            val = normalized[r][c]
+
+            if val is None or str(val).strip() == "":
+
+                if c > 0:
+
+                    left = normalized[r][c - 1]
+
+                    if left not in [None, ""]:
+                        normalized[r][c] = left
+
+    return normalized
+
+
+# ========================================
+# ===== pdf 표 추출 =====
+# ========================================
+def extract_pdf_tables(page):
+    lines = []
+    num = 1
+
+    try:
+
+        tables = page.extract_tables()
+
+        for table in tables:
+
+            if not table:
+                continue
+
+            table = fill_merged_cells(table)
+
+            for row in table:
+
+                cells = []
+
+                for cell in row:
+
+                    # 공백 셀
+                    if cell is None:
+                        cell = "-"
+
+                    cell = str(cell).strip()
+
+                    if not cell:
+                        cell = "-"
+
+                    # 줄바꿈 제거
+                    cell = re.sub(r"\s+", " ", cell)
+
+                    cells.append(cell)
+
+                row_text = " | ".join(cells)
+
+                lines.append({"sentenceId": num, "sentence": row_text})
+                num += 1
+
+    except Exception as e:
+
+        print(f"[WARN] table extraction failed: {e}")
+
+    return lines
 
 
 # ========================================
@@ -172,6 +275,7 @@ def split_sentences(lines):
 
 def extract_excel(file_path):
     output = []
+    num = 1
 
     try:
 
@@ -207,7 +311,8 @@ def extract_excel(file_path):
                 row_text = " | ".join(cells)
 
                 if row_text:
-                    output.append(row_text)
+                    output.append({"sentenceId": num, "sentence": row_text})
+                    num += 1
 
         print(f"[EXCEL] extracted rows: {len(output)}")
 
@@ -453,8 +558,10 @@ def extract_hwp(file_path):
         # --------------------------
         normal_lines, table_lines = extract_pdf(str(pdf_path))
 
-        sentences = split_sentences(normal_lines)
-        sentences.extend(table_lines)
+        start_id = len(table_lines) + 1
+        normal_lines = split_sentences(normal_lines, start_id)
+        sentences = table_lines.copy()
+        sentences.extend(normal_lines)
 
         # 내용이 하나도 없는 경우(HWP 기준으로 경고 출력)
         if not sentences:
@@ -483,7 +590,7 @@ def extract_hwpx(file_path):
 
     normal_lines = []
     table_lines = []
-
+    num = 1
     try:
 
         with zipfile.ZipFile(file_path, 'r') as z:
@@ -561,7 +668,8 @@ def extract_hwpx(file_path):
                                 # 표는 그대로 유지
                                 row_sentence = " | ".join(cell_texts)
 
-                                table_lines.append(row_sentence)
+                                table_lines.append({"sentenceId": num, "sentence": row_sentence})
+                                num += 1
 
     except Exception as e:
 
@@ -697,7 +805,7 @@ def process_file(data):
             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                 tmp_path = tmp.name
 
-            r = requests.get(file_url, timeout=30)
+            r = requests.get(file_url, timeout=120)
             r.raise_for_status()
 
             with open(tmp_path, "wb") as f:
@@ -706,8 +814,10 @@ def process_file(data):
             if ext == ".pdf":
                 normal_lines, table_lines = extract_pdf(tmp_path)
 
-                sentences = split_sentences(normal_lines)
-                sentences.extend(table_lines)
+                start_id = len(table_lines) +1
+                normal_lines = split_sentences(normal_lines,start_id)
+                sentences = table_lines.copy()
+                sentences.extend(normal_lines)
 
             elif ext in [".xls", ".xlsx"]:
                 sentences = extract_excel(tmp_path)
@@ -717,9 +827,11 @@ def process_file(data):
 
             elif ext == ".hwpx":
                 normal_lines, table_lines = extract_hwpx(tmp_path)
-                sentences = split_sentences(normal_lines)
-
-                sentences.extend(table_lines)
+                
+                start_id = len(table_lines) +1
+                normal_lines = split_sentences(normal_lines,start_id)
+                sentences = table_lines.copy()
+                sentences.extend(normal_lines)
 
             elif ext == ".zip":
 
@@ -739,16 +851,20 @@ def process_file(data):
 
                         if inner_ext == ".pdf":
                             normal_lines, table_lines = extract_pdf(inner_path)
-                            sentences = split_sentences(normal_lines)
-                            sentences.extend(table_lines)
+                            start_id = len(table_lines) + 1
+                            normal_lines = split_sentences(normal_lines, start_id)
+                            sentences = table_lines.copy()
+                            sentences.extend(normal_lines)
 
                         elif inner_ext == ".hwp":
                             sentences = extract_hwp(inner_path)
 
                         elif inner_ext == ".hwpx":
                             normal_lines, table_lines = extract_hwpx(inner_path)
-                            sentences = split_sentences(normal_lines)
-                            sentences.extend(table_lines)
+                            start_id = len(table_lines) + 1
+                            normal_lines = split_sentences(normal_lines, start_id)
+                            sentences = table_lines.copy()
+                            sentences.extend(normal_lines)
 
                         elif inner_ext in [".xls", ".xlsx"]:
                             sentences = extract_excel(inner_path)
