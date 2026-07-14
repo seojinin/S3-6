@@ -22,8 +22,26 @@ hwp = win32com.client.gencache.EnsureDispatch("HWPFrame.HwpObject")
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 
+ATTACHMENT_NAME_PATTERNS = [
+    r"시\s*방\s*서",
+    r"제\s*안\s*요\s*청\s*서",
+    r"과\s*업\s*지\s*시\s*서",
+]
+
 KEEP_TITLE_KEYWORDS = ["자재", "재료", "제품", "기구", "기기", "부속품"]
 KEYWORD_MATCH_MODE = "OR"
+
+
+########################################
+# ===== 첨부파일 필터 =====
+########################################
+
+def is_target_doc(file_name):
+    return any(
+        re.search(pattern, file_name)
+        for pattern in ATTACHMENT_NAME_PATTERNS
+    )
+
 
 ########################################
 # ===== 챕터 제목 패턴 =====
@@ -811,6 +829,12 @@ def process_file(data):
             with open(tmp_path, "wb") as f:
                 f.write(r.content)
 
+            if ext in [".pdf", ".hwp", ".hwpx"]:
+
+                if not is_target_doc(file_name):
+                    print(f"[SKIP] Not target document : {file_name}")
+                    continue
+
             if ext == ".pdf":
                 normal_lines, table_lines = extract_pdf(tmp_path)
 
@@ -848,6 +872,12 @@ def process_file(data):
 
                         inner_name = os.path.basename(inner_path)
                         inner_ext = os.path.splitext(inner_name)[1].lower()
+
+                        if inner_ext in [".pdf", ".hwp", ".hwpx"]:
+
+                            if not is_target_doc(inner_name):
+                                print(f"[ZIP SKIP] {inner_name}")
+                                continue
 
                         if inner_ext == ".pdf":
                             normal_lines, table_lines = extract_pdf(inner_path)
