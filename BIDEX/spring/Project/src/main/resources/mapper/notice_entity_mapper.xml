@@ -14,21 +14,8 @@
 		</foreach>
 	</insert>
 
-<<<<<<< HEAD
 	<!-- 공고 ID로 조회 (상세페이지 AI 리포트용, 회원별 키워드 매칭 여부 포함) -->
 	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeEntityModel">
-		SELECT
-    e.entity_id,
-    n.notice_number,
-    e.entity_value,
-    e.entity_type,
-    e.file_name,
-    n.notice_title,
-    e.file_url,
-=======
-	<!-- 공고 ID로 조회 -->
-	<select id="selectByNoticeNumber"
-		resultType="pj.notice.model.NoticeEntityModel">
 		SELECT
 			e.entity_id,
 			n.notice_number,
@@ -72,7 +59,6 @@
 		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
 		WHERE n.notice_title LIKE CONCAT('%', #{keyword}, '%')
 		OR e.entity_value LIKE CONCAT('%', #{keyword}, '%')
->>>>>>> 776b62fc2262bca80705168da3a2f45575323412
 
 	</select> -->
 
