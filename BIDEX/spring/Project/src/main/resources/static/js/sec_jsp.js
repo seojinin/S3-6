@@ -380,7 +380,7 @@ async function showBidDetail(notice_number, pushHistory = true) {
 
 function renderAiReport(entities) {
     const statusEl = document.getElementById('detailStatus');
-    const listEl = document.getElementById('aiReportList');
+    const listEl   = document.getElementById('aiReportList');
     if (!listEl) return;
 
     const valid = (entities || []).filter(e => e.file_name && e.entity_value);
@@ -395,24 +395,67 @@ function renderAiReport(entities) {
         return;
     }
 
+    // 검색 키워드 (비로그인 포함 항상 적용) — 소문자로 비교
+    const searchKws   = (searchKeywords || []).map(k => k.toLowerCase());
+
+    // 관심 키워드 (로그인 시에만 적용)
+    const interestKws = (DB.currentUser && userKeywords.length > 0)
+        ? userKeywords.map(k => k.toLowerCase())
+        : [];
+
+    // 검색/관심 키워드와 일치하는 것만 필터링
+    const filtered = valid.filter(e => {
+        const val = (e.entity_value || '').toLowerCase();
+        return searchKws.some(kw => val.includes(kw) || kw.includes(val))
+            || interestKws.some(kw => val.includes(kw) || kw.includes(val));
+    });
+
+    // 매칭 키워드 없을 때
+    if (filtered.length === 0) {
+        const msg = (searchKws.length === 0 && interestKws.length === 0)
+            ? '검색 키워드를 입력하거나 관심 키워드를 등록하면 관련 항목이 표시됩니다.'
+            : '입력한 키워드와 일치하는 항목이 없습니다.';
+        listEl.innerHTML = `<div class="ai-report-file-card"><div class="ai-report-empty">${msg}</div></div>`;
+        return;
+    }
+
     // file_name별로 묶기
     const byFile = {};
-    valid.forEach(e => {
+    filtered.forEach(e => {
         if (!byFile[e.file_name]) byFile[e.file_name] = [];
         byFile[e.file_name].push(e);
     });
 
-    listEl.innerHTML = Object.entries(byFile).map(([fileName, list]) => `
+    // 범례
+    const legendHtml = `
+        <div class="ai-report-legend">
+            ${searchKws.length   > 0 ? '<span class="ai-legend-chip search-highlight">검색 키워드</span>'   : ''}
+            ${interestKws.length > 0 ? '<span class="ai-legend-chip interest-highlight">관심 키워드</span>' : ''}
+        </div>`;
+
+    listEl.innerHTML = legendHtml + Object.entries(byFile).map(([fileName, list]) => `
         <div class="ai-report-file-card">
             <div class="ai-report-file-header">
                 <span class="ai-report-file-name"><i class="fa-solid fa-file-lines"></i> ${fileName}</span>
-                <span class="ai-report-file-count">${list.length}개 키워드 추출</span>
+                <span class="ai-report-file-count">${list.length}개 키워드 매칭</span>
             </div>
             <div class="ai-report-chips">
                 ${list.map(e => {
-                    const st = getEntityStyle(e.entity_type);
-                    return `<span class="ai-report-chip" style="background:${st.bg};color:${st.color};">
-                        <span class="chip-dot" style="background:${st.color};"></span>${e.matched ? "키워드" : ""}${st.label} ${e.entity_value}
+                    const val = (e.entity_value || '').toLowerCase();
+                    const isInterest = interestKws.some(kw => val.includes(kw) || kw.includes(val));
+                    const isSearch   = searchKws.some(kw => val.includes(kw) || kw.includes(val));
+
+                    let chipStyle, dotStyle;
+                    if (isInterest) {
+                        chipStyle = 'background:#fef9c3;color:#92400e;border:1.5px solid #fcd34d;';
+                        dotStyle  = 'background:#f59e0b;';
+                    } else {
+                        chipStyle = 'background:#fce7f3;color:#9d174d;border:1.5px solid #f9a8d4;';
+                        dotStyle  = 'background:#ec4899;';
+                    }
+
+                    return `<span class="ai-report-chip" style="${chipStyle}">
+                        <span class="chip-dot" style="${dotStyle}"></span>${e.entity_value}
                     </span>`;
                 }).join('')}
             </div>

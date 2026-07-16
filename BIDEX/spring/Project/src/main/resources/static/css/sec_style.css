@@ -8,7 +8,7 @@
 }
 
 body {
-    background: #f6f7f9;
+    background: #ffffff;
     color: #222;
 }
 
@@ -232,24 +232,45 @@ section.active {
 }
 
 /* ===== Main ===== */
+#main {
+    margin-top: -40px;
+}
+
 .hero {
     display: flex;
     justify-content: space-between;
     align-items: stretch;
-    background-image: url('/img/building2.png');
-    background-size: cover;
-    background-position: center;
-    border-radius: 16px;
-    overflow: hidden;
-    gap: 0;
     position: relative;
+    min-height: 620px;
+    overflow: visible;
+    gap: 0;
+    margin: 0 -24px;
+    margin-bottom: -160px;
+    padding: 0 24px 160px 24px;
 }
 
+/* 배경 이미지 — 히어로 전체를 꽉 채움 */
+.hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/img/building2.png');
+    background-size: cover;
+    background-position: center top;
+    z-index: 0;
+}
+
+/* 경계 제거 그라데이션 — 하단을 훨씬 위까지 페이드해서 사진이 아래 섹션까지 침범 */
 .hero::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to right, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.85) 27%, rgba(255,255,255,0) 38%);
+    background:
+        linear-gradient(to right,  rgba(255,255,255,1) 0%, rgba(255,255,255,0.95) 30%, rgba(255,255,255,0.3) 55%, rgba(255,255,255,0) 65%),
+        linear-gradient(to left,   rgba(255,255,255,1) 0%, rgba(255,255,255,0.85) 10%, rgba(255,255,255,0) 30%),
+        linear-gradient(to top,    rgba(255,255,255,1) 0%, rgba(255,255,255,1) 18%, rgba(255,255,255,0.7) 35%, rgba(255,255,255,0) 62%),
+        linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 12%);
+    z-index: 1;
     pointer-events: none;
 }
 
@@ -260,7 +281,7 @@ section.active {
     justify-content: center;
     padding: 48px;
     position: relative;
-    z-index: 1;
+    z-index: 2;
 }
 
 .hero-text h1 {
@@ -305,7 +326,7 @@ section.active {
     position: relative;
     min-height: 340px;
     overflow: hidden;
-    z-index: 1;
+    z-index: 2;
 }
 
 /* ===== Keyword Panel (히어로 위 오버레이 카드) ===== */
@@ -618,7 +639,10 @@ section.active {
 /* ===== 왜 BIDEX가 다른가요 (비교 섹션) ===== */
 .compare-section {
     padding: 56px 40px;
-    margin-top: 40px;
+    margin-top: 0;
+    position: relative;
+    z-index: 3;
+    background: transparent;
 }
 
 .compare-title {
@@ -910,7 +934,7 @@ td {
     right: 50%;
     margin-left: -50vw;
     margin-right: -50vw;
-    margin-top: -40px;
+    margin-top: 0;
     width: 100vw;
     padding-bottom: 110px;
     overflow: hidden;
@@ -1626,6 +1650,33 @@ td {
     color: #9ca3af;
     padding: 20px 0;
     text-align: center;
+}
+
+/* ===== AI 리포트 범례 ===== */
+.ai-report-legend {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.ai-legend-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.search-highlight {
+    background: #fce7f3;
+    color: #9d174d;
+    border: 1.5px solid #f9a8d4;
+}
+.interest-highlight {
+    background: #fef9c3;
+    color: #92400e;
+    border: 1.5px solid #fcd34d;
 }
 
 .loading-row td {
