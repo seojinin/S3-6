@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import pj.notice.model.NoticeModel;
 
@@ -14,7 +15,7 @@ public interface NoticeMapper {
 
     NoticeModel selectNoticeById(Long notice_id);
 
-    List<NoticeModel> selectAllNotices();
+    List<NoticeModel> selectAllNotices(@Param("region") String region, @Param("contractMethod") String contractMethod, @Param("agency") String agency);
 
     NoticeModel selectByNoticeNumber(String noticeNumber);
 

@@ -290,10 +290,10 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
     }
 
     @Override
-    public List<NoticeModel> getAllNotices() {
-	return noticeMapper.selectAllNotices();
+    public List<NoticeModel> getAllNotices(String region, String contractMethod, String agency) {
+	return noticeMapper.selectAllNotices(region, contractMethod, agency);
     }
-    
+
     @Override
     public Map<String, Object> getNoticeDetail(String noticeNumber) {
 

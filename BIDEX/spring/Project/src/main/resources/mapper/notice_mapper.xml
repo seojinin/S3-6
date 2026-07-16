@@ -40,8 +40,8 @@
 	</select>
 
 	<!-- 키워드 검색도 가능하게 하려고 수정 -->
-	<select id="selectAllNotices"
-		resultType="pj.notice.model.NoticeModel">
+	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
+
 		SELECT
 		n.notice_id,
 		n.notice_number,
@@ -60,12 +60,30 @@
 		GROUP_CONCAT(DISTINCT e.file_url SEPARATOR '| ') AS file_url
 
 		FROM tb_notice n
+
 		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
-		GROUP BY n.notice_id;
+
+		<where>
+
+			<if test="region != null and region != '' and region != '전체 지역'">
+				AND n.region LIKE CONCAT('%', #{region}, '%')
+			</if>
+
+			<if
+				test="contractMethod != null and contractMethod != '' and contractMethod != '전체 계약방법'">
+				AND n.contract_method = #{contractMethod}
+			</if>
+
+			<if test="agency != null and agency != '' and agency != '전체 기관'">
+				AND n.agency = #{agency}
+			</if>
+
+		</where>
+		GROUP BY n.notice_id
+		ORDER BY n.created_at DESC
 	</select>
 
-	<select id="selectByNoticeNumber"
-		resultType="pj.notice.model.NoticeModel">
+	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeModel">
 		SELECT * FROM tb_notice
 		WHERE notice_number = #{noticeNumber}
 	</select>
