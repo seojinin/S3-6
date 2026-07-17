@@ -131,6 +131,7 @@ function removeSearchKeyword(kw) {
 
 // ===== 목록 상태 저장/복원 =====
 let savedBidState = null;
+let activeSearchKws = [];  // 상세 페이지에서도 유지되는 검색 키워드
 
 function saveBidState() {
     savedBidState = {
@@ -141,6 +142,10 @@ function saveBidState() {
         methodFilter:   document.getElementById('methodFilter')?.value || '',
         agencyFilter:   document.getElementById('agencyFilter')?.value || '',
     };
+    // 상세 페이지에서도 유지할 검색 키워드 저장
+    const inputVal = document.getElementById('searchInput')?.value.trim() || '';
+    activeSearchKws = [...searchKeywords];
+    if (inputVal && !activeSearchKws.includes(inputVal)) activeSearchKws.push(inputVal);
 }
 
 function restoreBidState() {
@@ -395,8 +400,8 @@ function renderAiReport(entities) {
         return;
     }
 
-    // 검색 키워드 (비로그인 포함 항상 적용) — 소문자로 비교
-    const searchKws   = (searchKeywords || []).map(k => k.toLowerCase());
+    // 검색 키워드 — saveBidState()에서 저장한 activeSearchKws 사용
+    const searchKws = activeSearchKws.filter(k => k.trim()).map(k => k.toLowerCase());
 
     // 관심 키워드 (로그인 시에만 적용)
     const interestKws = (DB.currentUser && userKeywords.length > 0)
