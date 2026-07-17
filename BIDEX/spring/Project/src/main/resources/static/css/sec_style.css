@@ -241,35 +241,35 @@ section.active {
     justify-content: space-between;
     align-items: stretch;
     position: relative;
-    min-height: 620px;
+    min-height: clamp(300px, 27vw, 380px);
     overflow: visible;
     gap: 0;
     margin: 0 -24px;
-    margin-bottom: -160px;
-    padding: 0 24px 160px 24px;
+    margin-bottom: -200px;
+    padding: 0 24px 200px 24px;
 }
 
-/* 배경 이미지 — 히어로 전체를 꽉 채움 */
+/* 배경 이미지 — 히어로 전체를 꽉 채움 (화면이 좁아져도 과도하게 확대/크롭되지 않도록 높이를 clamp로 제한) */
 .hero::after {
     content: '';
     position: absolute;
     inset: 0;
     background-image: url('/img/building2.png');
     background-size: cover;
-    background-position: center top;
+    background-position: center 75%;
     z-index: 0;
 }
-
-/* 경계 제거 그라데이션 — 하단을 훨씬 위까지 페이드해서 사진이 아래 섹션까지 침범 */
+/* 경계 제거 그라데이션 — 상단은 하늘색 띠로 이어붙이고, 좌측 흰배경 → 우측 사진 순서로 자연스럽게 전환 */
 .hero::before {
     content: '';
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(to right,  rgba(255,255,255,1) 0%, rgba(255,255,255,0.95) 30%, rgba(255,255,255,0.3) 55%, rgba(255,255,255,0) 65%),
-        linear-gradient(to left,   rgba(255,255,255,1) 0%, rgba(255,255,255,0.85) 10%, rgba(255,255,255,0) 30%),
-        linear-gradient(to top,    rgba(255,255,255,1) 0%, rgba(255,255,255,1) 18%, rgba(255,255,255,0.7) 35%, rgba(255,255,255,0) 62%),
-        linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 12%);
+        radial-gradient(circle 90px at 94% -10%, transparent 88%, rgba(37,99,235,0.35) 37%, rgba(37,99,235,0.35) 93%, transparent 94%),
+        radial-gradient(circle 145px at 94% -10%, transparent 90%, rgba(37,99,235,0.16) 47%, rgba(37,99,235,0.16) 94%, transparent 95%),
+        linear-gradient(to bottom, rgba(210,229,248,0.9) 0%, rgba(210,229,248,0.45) 6%, rgba(255,255,255,0) 18%),
+        linear-gradient(to right,  #ffffff 0%, #ffffff 38%, rgba(255,255,255,0.6) 48%, rgba(255,255,255,0) 62%),
+        linear-gradient(to top,    #ffffff 0%, #ffffff 14%, rgba(255,255,255,0.6) 32%, rgba(255,255,255,0) 55%);
     z-index: 1;
     pointer-events: none;
 }
@@ -332,14 +332,16 @@ section.active {
 /* ===== Keyword Panel (히어로 위 오버레이 카드) ===== */
 .keyword-panel {
     position: absolute;
-    top: 24px;
-    left: 24px;
-    width: 300px;
+    top: 50%;
+    left: 32%;
+    transform: translateY(-50%);
+    width: 280px;
     background: rgba(255,255,255,0.97);
     border-radius: 14px;
     padding: 20px 22px;
     box-shadow: 0 12px 32px rgba(15, 47, 107, 0.18);
     display: none;
+    z-index: 3;
 }
 
 .keyword-panel.show {
@@ -657,7 +659,7 @@ section.active {
     text-align: center;
     color: #4b5563;
     font-size: 15px;
-    margin-bottom: 40px;
+    margin-bottom: 50px;
 }
 
 .compare-cards {
@@ -797,7 +799,7 @@ section.active {
 
 /* ===== Main Bid List ===== */
 .main-bid-section {
-    margin-top: 60px;
+    margin-top: 10px;
 }
 
 .main-bid-section h2 {
