@@ -9,8 +9,10 @@ public interface NoticeApiServiceIF {
 
     void fetchNoticeFromApi();
 
-    List<NoticeModel> getAllNotices(String region, String contractMethod, String agency);
+    List<NoticeModel> getAllNotices();
 
     Map<String, Object> getNoticeDetail(String noticeNumber);
+    
+    Map<String, Object> getNoticeStats(Long memberId);
 
 }

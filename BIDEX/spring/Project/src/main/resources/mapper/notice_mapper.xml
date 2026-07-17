@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper
-  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="pj.notice.mapper.NoticeMapper">
 
@@ -40,8 +38,8 @@
 	</select>
 
 	<!-- 키워드 검색도 가능하게 하려고 수정 -->
-	<select id="selectAllNotices" resultType="pj.notice.model.NoticeModel">
-
+	<select id="selectAllNotices"
+		resultType="pj.notice.model.NoticeModel">
 		SELECT
 		n.notice_id,
 		n.notice_number,
@@ -60,30 +58,12 @@
 		GROUP_CONCAT(DISTINCT e.file_url SEPARATOR '| ') AS file_url
 
 		FROM tb_notice n
-
 		LEFT JOIN tb_notice_entity e ON n.notice_number = e.notice_number
-
-		<where>
-
-			<if test="region != null and region != '' and region != '전체 지역'">
-				AND n.region LIKE CONCAT('%', #{region}, '%')
-			</if>
-
-			<if
-				test="contractMethod != null and contractMethod != '' and contractMethod != '전체 계약방법'">
-				AND n.contract_method = #{contractMethod}
-			</if>
-
-			<if test="agency != null and agency != '' and agency != '전체 기관'">
-				AND n.agency = #{agency}
-			</if>
-
-		</where>
-		GROUP BY n.notice_id
-		ORDER BY n.created_at DESC
+		GROUP BY n.notice_id;
 	</select>
 
-	<select id="selectByNoticeNumber" resultType="pj.notice.model.NoticeModel">
+	<select id="selectByNoticeNumber"
+		resultType="pj.notice.model.NoticeModel">
 		SELECT * FROM tb_notice
 		WHERE notice_number = #{noticeNumber}
 	</select>
@@ -117,6 +97,27 @@
 		file_url AS fileUrl
 		FROM tb_notice_file
 		WHERE notice_number = #{noticeNumber}
+	</select>
+	
+	<select id="countActiveNotices" resultType="int">
+		SELECT COUNT(*) FROM tb_notice
+	</select>
+
+	<select id="countTodayNotices" resultType="int">
+		SELECT COUNT(*) FROM tb_notice
+		WHERE DATE(notice_date) = CURDATE()
+	</select>
+
+	<select id="selectAvgAmount" resultType="double">
+		SELECT IFNULL(AVG(amount), 0) FROM tb_notice
+		WHERE amount IS NOT NULL AND amount > 0
+	</select>
+
+	<select id="countKeywordMatchByMember" resultType="int">
+		SELECT COUNT(DISTINCT nkm.notice_number)
+		FROM tb_notice_keyword_map nkm
+		JOIN tb_member_keyword mk ON nkm.keyword_id = mk.keyword_id
+		WHERE mk.member_id = #{memberId}
 	</select>
 	
 </mapper>

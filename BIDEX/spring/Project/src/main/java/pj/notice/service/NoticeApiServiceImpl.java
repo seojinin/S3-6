@@ -290,10 +290,10 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
     }
 
     @Override
-    public List<NoticeModel> getAllNotices(String region, String contractMethod, String agency) {
-	return noticeMapper.selectAllNotices(region, contractMethod, agency);
+    public List<NoticeModel> getAllNotices() {
+	return noticeMapper.selectAllNotices();
     }
-
+    
     @Override
     public Map<String, Object> getNoticeDetail(String noticeNumber) {
 
@@ -306,6 +306,23 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 	result.put("files", noticeMapper.selectNoticeFiles(noticeNumber));
 
 	return result;
+    }
+    
+    @Override
+    public Map<String, Object> getNoticeStats(Long memberId) {
+        
+    	Map<String, Object> stats = new HashMap<>();
+        
+    	stats.put("totalCount", noticeMapper.countActiveNotices());
+        stats.put("todayCount", noticeMapper.countTodayNotices());
+        stats.put("avgAmount", noticeMapper.selectAvgAmount());
+
+        if (memberId != null) {
+            stats.put("keywordMatchCount", noticeMapper.countKeywordMatchByMember(memberId));
+        } else {
+            stats.put("keywordMatchCount", null);
+        }
+        return stats;
     }
 
 //    public Map<String, Object> getNoticeDetailLive(String noticeNumber) {
