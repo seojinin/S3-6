@@ -11,3 +11,7 @@ tika
 lxml
 requests
 xlrd
+PyMuPDF
+
+protobuf
+tiktoken
