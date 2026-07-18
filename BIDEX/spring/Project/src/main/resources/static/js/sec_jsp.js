@@ -468,17 +468,27 @@ function renderAiReport(entities) {
 }
 
 // ===== 페이지네이션 =====
+// 검색 결과(apiData)를 유지한 채로 페이지만 이동
+function goToPage(page) {
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderBidTable();
+    renderPagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function renderPagination() {
     const totalPages = Math.ceil(totalCount / itemsPerPage);
     const div = document.getElementById('pagination');
-    let html = `<button onclick="fetchBidList(${currentPage-1})" ${currentPage===1?'disabled':''}>이전</button>`;
+    let html = `<button onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>이전</button>`;
     for (let i = 1; i <= totalPages; i++) {
         if (i===1 || i===totalPages || (i>=currentPage-2 && i<=currentPage+2))
-            html += `<button onclick="fetchBidList(${i})" class="${i===currentPage?'active':''}">${i}</button>`;
+            html += `<button onclick="goToPage(${i})" class="${i===currentPage?'active':''}">${i}</button>`;
         else if (i===currentPage-3 || i===currentPage+3)
             html += `<button disabled>...</button>`;
     }
-    html += `<button onclick="fetchBidList(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>다음</button>`;
+    html += `<button onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>다음</button>`;
     div.innerHTML = html;
 }
 
