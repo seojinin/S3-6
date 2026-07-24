@@ -133,11 +133,14 @@
 		WHERE amount IS NOT NULL AND amount > 0
 	</select>
 
-	<select id="countKeywordMatchByMember" resultType="int">
-		SELECT COUNT(DISTINCT nkm.notice_number)
-		FROM tb_notice_keyword_map nkm
-		JOIN tb_member_keyword mk ON nkm.keyword_id = mk.keyword_id
-		WHERE mk.member_id = #{memberId}
-	</select>
+<select id="countKeywordMatchByMember" resultType="int">
+    SELECT COUNT(DISTINCT n.notice_number)
+    FROM tb_notice n
+    JOIN tb_member_keyword mk ON mk.member_id = #{memberId}
+    JOIN tb_keyword k ON k.keyword_id = mk.keyword_id
+    LEFT JOIN tb_notice_entity e ON e.notice_number = n.notice_number
+    WHERE n.notice_title LIKE CONCAT('%', k.standard_word, '%')
+       OR e.entity_value LIKE CONCAT('%', k.standard_word, '%')
+</select>
 
 </mapper>
