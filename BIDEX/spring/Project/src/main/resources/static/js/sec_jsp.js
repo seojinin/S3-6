@@ -84,7 +84,29 @@ async function checkLoginStatus() {
 function goToNoticeDetail(notice_number, notificationId) {
     if (!notice_number) return;
     if (notificationId) {
-        markNotificationRead(notificationId).then(() => updateUnreadBadge());
+        // 공고 클릭 → 읽음 처리 (서버) + 해당 항목 읽음 스타일로 변경
+        markNotificationRead(notificationId).then(() => {
+            updateUnreadBadge();
+            // 마이페이지 알림 목록에서 해당 항목을 읽음 스타일로 변경
+            const el = document.getElementById(`noti-item-${notificationId}`);
+            if (el) {
+                el.style.borderLeftColor = '#d1d5db';
+                el.style.background      = '#f3f4f6';
+                el.style.opacity         = '0.7';
+                const badge = el.querySelector('.noti-keyword-badge');
+                if (badge) { badge.style.background = '#e5e7eb'; badge.style.color = '#6b7280'; }
+                const title = el.querySelector('.noti-title');
+                if (title) title.style.color = '#9ca3af';
+                const readMark = el.querySelector('.noti-read-mark');
+                if (!readMark) {
+                    const span = document.createElement('span');
+                    span.className = 'noti-read-mark';
+                    span.style.cssText = 'margin-left:8px;font-size:11px;color:#9ca3af;';
+                    span.textContent = '✓ 읽음';
+                    el.querySelector('div')?.appendChild(span);
+                }
+            }
+        });
     }
     const d = document.getElementById('notificationDropdown');
     if (d) d.classList.remove('show');
@@ -1081,8 +1103,8 @@ function renderNotifications(notis) {
                     <div class="notification-item" id="noti-item-${n.notification_id}" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})"
                          style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding:10px 15px;border-radius:6px;background:#eff6ff;">
                         <div>
-                            <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
-                            <strong style="color:#111827;">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                            <span class="noti-keyword-badge" style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
+                            <strong class="noti-title" style="color:#111827;">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
                         </div>
                         <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
                         <button class="delete-noti" onclick="event.stopPropagation(); removeNotification(${n.notification_id})" title="삭제">×</button>
@@ -1092,13 +1114,13 @@ function renderNotifications(notis) {
     }
 }
 
-// x 버튼: 서버에 읽음 처리 후 DOM에서 즉시 제거 (새로고침 없이)
+// x 버튼: DOM에서 즉시 제거 + 서버 읽음 처리
 async function removeNotification(notificationId) {
     // DOM에서 즉시 제거
     const el = document.getElementById(`noti-item-${notificationId}`);
     if (el) el.remove();
 
-    // 남은 항목 없으면 빈 메시지 표시
+    // 남은 읽지 않은 항목 없으면 빈 메시지 표시
     const list = document.getElementById('notificationList');
     if (list && list.querySelectorAll('.notification-item').length === 0) {
         list.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
