@@ -1072,26 +1072,45 @@ function renderNotifications(notis) {
         if (notis.length === 0) {
             mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
         } else {
-            mypageList.innerHTML = notis.map(n => `
-                <div class="notification-item" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})"
-                     style="cursor:pointer;margin-bottom:10px;border-left:4px solid ${n.is_read ? '#d1d5db' : '#2563eb'};padding:10px 15px;border-radius:6px;
-                            background:${n.is_read ? '#f3f4f6' : '#eff6ff'};">
-                    <div>
-                        <span style="background:${n.is_read ? '#e5e7eb' : '#e0e7ff'};color:${n.is_read ? '#6b7280' : '#4338ca'};padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
-                        <strong style="color:${n.is_read ? '#9ca3af' : '#111827'};">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
-                        ${n.is_read ? '<span style="margin-left:8px;font-size:11px;color:#9ca3af;">✓ 읽음</span>' : ''}
-                    </div>
-                    <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
-                    <button class="delete-noti" onclick="event.stopPropagation(); deleteNotification(${n.notification_id})" title="읽음 처리">×</button>
-                </div>`).join('');
+            // 읽지 않은 알림만 표시
+            const unreadNotis = notis.filter(n => !n.is_read);
+            if (unreadNotis.length === 0) {
+                mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
+            } else {
+                mypageList.innerHTML = unreadNotis.map(n => `
+                    <div class="notification-item" id="noti-item-${n.notification_id}" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})"
+                         style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding:10px 15px;border-radius:6px;background:#eff6ff;">
+                        <div>
+                            <span style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
+                            <strong style="color:#111827;">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                        </div>
+                        <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
+                        <button class="delete-noti" onclick="event.stopPropagation(); removeNotification(${n.notification_id})" title="삭제">×</button>
+                    </div>`).join('');
+            }
         }
     }
 }
 
-// 백엔드에 알림 삭제 API가 없어, 읽음 처리 후 목록을 새로고침하는 방식으로 동작
-async function deleteNotification(notificationId) {
+// x 버튼: 서버에 읽음 처리 후 DOM에서 즉시 제거 (새로고침 없이)
+async function removeNotification(notificationId) {
+    // DOM에서 즉시 제거
+    const el = document.getElementById(`noti-item-${notificationId}`);
+    if (el) el.remove();
+
+    // 남은 항목 없으면 빈 메시지 표시
+    const list = document.getElementById('notificationList');
+    if (list && list.querySelectorAll('.notification-item').length === 0) {
+        list.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
+    }
+
+    // 서버 읽음 처리 (백그라운드)
     await markNotificationRead(notificationId);
-    await fetchNotificationsFromDB();
+    updateUnreadBadge();
+}
+
+async function deleteNotification(notificationId) {
+    await removeNotification(notificationId);
 }
 
 function toggleNotificationDropdown() {
