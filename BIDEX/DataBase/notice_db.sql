@@ -15,7 +15,7 @@ CREATE TABLE tb_notice (
 
     notice_date DATETIME,                  -- 입찰공고일
     opening_date DATETIME,                 -- 개찰일시
-    biz_type VARCHAR(255),                 -- 업무구분
+    biz_type VARCHAR(255),                 -- 등록유형
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
