@@ -154,6 +154,7 @@ function removeSearchKeyword(kw) {
 // ===== 목록 상태 저장/복원 =====
 let savedBidState = null;
 let activeSearchKws = [];  // 상세 페이지에서도 유지되는 검색 키워드
+const removedNotiIds = new Set();  // x로 제거한 알림 ID — polling 재렌더링 시 제외용
 
 function saveBidState() {
     savedBidState = {
@@ -1094,41 +1095,55 @@ function renderNotifications(notis) {
         if (notis.length === 0) {
             mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
         } else {
-            // 읽지 않은 알림만 표시
-            const unreadNotis = notis.filter(n => !n.is_read);
-            if (unreadNotis.length === 0) {
-                mypageList.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
-            } else {
-                mypageList.innerHTML = unreadNotis.map(n => `
+            // 전체 알림 표시 (읽은 것 포함) — x 누른 것(삭제)만 제외
+            mypageList.innerHTML = notis.filter(n => !removedNotiIds.has(n.notification_id)).map(n => {
+                const isRead = n.is_read;
+                return `
                     <div class="notification-item" id="noti-item-${n.notification_id}" onclick="goToNoticeDetail('${n.notice_number}', ${n.notification_id})"
-                         style="cursor:pointer;margin-bottom:10px;border-left:4px solid #2563eb;padding:10px 15px;border-radius:6px;background:#eff6ff;">
+                         style="cursor:pointer;margin-bottom:10px;border-left:4px solid ${isRead ? '#d1d5db' : '#2563eb'};padding:10px 15px;border-radius:6px;background:${isRead ? '#f3f4f6' : '#eff6ff'};opacity:${isRead ? '0.7' : '1'};">
                         <div>
-                            <span class="noti-keyword-badge" style="background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
-                            <strong class="noti-title" style="color:#111827;">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                            <span class="noti-keyword-badge" style="background:${isRead ? '#e5e7eb' : '#e0e7ff'};color:${isRead ? '#6b7280' : '#4338ca'};padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:8px;">${n.keyword || '알림'}</span>
+                            <strong class="noti-title" style="color:${isRead ? '#9ca3af' : '#111827'};">${n.notice_title || '공고 정보를 불러오는 중...'}</strong>
+                            ${isRead ? '<span class="noti-read-mark" style="margin-left:8px;font-size:11px;color:#9ca3af;">✓ 읽음</span>' : ''}
                         </div>
                         <span class="date" style="font-size:12px;color:#6b7280;">${n.created_at || '-'}</span>
                         <button class="delete-noti" onclick="event.stopPropagation(); removeNotification(${n.notification_id})" title="삭제">×</button>
-                    </div>`).join('');
-            }
+                    </div>`;
+            }).join('');
         }
     }
 }
 
-// x 버튼: DOM에서 즉시 제거 + 서버 읽음 처리
+// x 버튼: DOM에서 즉시 제거 + 서버 읽음 처리 (fetchNotificationsFromDB 재호출 안 함)
 async function removeNotification(notificationId) {
+    // 제거 목록에 추가 — polling 재렌더링 시 이 ID는 표시 안 함
+    removedNotiIds.add(notificationId);
+
     // DOM에서 즉시 제거
     const el = document.getElementById(`noti-item-${notificationId}`);
     if (el) el.remove();
 
-    // 남은 읽지 않은 항목 없으면 빈 메시지 표시
+    // 남은 항목 없으면 빈 메시지 표시
     const list = document.getElementById('notificationList');
     if (list && list.querySelectorAll('.notification-item').length === 0) {
         list.innerHTML = '<div class="no-notification">새로운 입찰공고 알림이 없습니다.</div>';
     }
 
-    // 서버 읽음 처리 (백그라운드)
-    await markNotificationRead(notificationId);
-    updateUnreadBadge();
+    // 뱃지 숫자 직접 감소 (재렌더링 없이)
+    const badge = document.getElementById('notificationBadge');
+    if (badge) {
+        const current = parseInt(badge.textContent) || 0;
+        const next = Math.max(0, current - 1);
+        badge.textContent = next;
+        badge.style.display = next === 0 ? 'none' : 'flex';
+    }
+
+    // 서버 읽음 처리 (백그라운드, 목록 재렌더링 없이)
+    try {
+        await fetch(`http://localhost:8080/api/notifications/${notificationId}/read`, { method: 'PUT' });
+    } catch (e) {
+        console.error('알림 읽음 처리 실패:', e);
+    }
 }
 
 async function deleteNotification(notificationId) {
