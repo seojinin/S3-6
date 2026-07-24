@@ -516,23 +516,28 @@ function renderPagination() {
 }
 
 // ===== 통계 =====
-function updateBidStats() {
-    const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
-    const todayCount = allData.filter(b => String(b.bid_start||'').startsWith(today)).length;
-    let matchedCount = 0;
-    if (currentMember) {
-        const kws = userKeywords;
-        matchedCount = allData.filter(b => kws.some(kw => (b.notice_title||'').includes(kw))).length;
+async function updateBidStats() {
+    try {
+        const res = await fetch('http://localhost:8080/api/notices/stats', { credentials: 'include' });
+        if (!res.ok) throw new Error('통계 API 응답 오류');
+        const stats = await res.json();
+
+        document.getElementById('totalBids').textContent = stats.totalCount ?? '-';
+        document.getElementById('todayBids').textContent = stats.todayCount ?? '-';
+        document.getElementById('avgAmount').textContent = (stats.avgAmount != null) ? formatAmount(Math.round(stats.avgAmount)) : '-';
+
+        const matchedEl = document.getElementById('matchedBids');
+        if (stats.keywordMatchCount == null) {
+            matchedEl.textContent = '-';
+            matchedEl.title = '로그인 후 이용해보세요';
+        } else {
+            matchedEl.textContent = stats.keywordMatchCount;
+            matchedEl.title = '';
+        }
+    } catch (e) {
+        console.error('통계 API 호출 실패:', e);
     }
-    const amounts   = allData.map(b => parseInt(b.amount||0)).filter(n => n > 0);
-    const avgAmount = amounts.length ? formatAmount(Math.round(amounts.reduce((a,b)=>a+b,0)/amounts.length)) : '-';
-
-    document.getElementById('totalBids').textContent   = allData.length;
-    document.getElementById('todayBids').textContent   = todayCount;
-    document.getElementById('matchedBids').textContent = matchedCount;
-    document.getElementById('avgAmount').textContent   = avgAmount;
 }
-
 // ===== 검색/필터 =====
 
 // 입력창에 남은 텍스트를 칩으로 추가하고 비움

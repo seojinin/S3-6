@@ -15,7 +15,7 @@ public interface NoticeMapper {
 
     NoticeModel selectNoticeById(Long notice_id);
 
-    List<NoticeModel> selectAllNotices();
+    List<NoticeModel> selectAllNotices(@Param("region") String region, @Param("contractMethod") String contractMethod, @Param("agency") String agency);
 
     NoticeModel selectByNoticeNumber(String noticeNumber);
 
@@ -24,7 +24,7 @@ public interface NoticeMapper {
     void insertNoticeFile(NoticeModel notice);
 
     List<Map<String, Object>> selectNoticeFiles(String noticeNumber);
-    
+
     int countActiveNotices();
 
     int countTodayNotices();

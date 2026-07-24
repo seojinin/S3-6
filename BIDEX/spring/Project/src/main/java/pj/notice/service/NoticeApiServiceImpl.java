@@ -42,9 +42,12 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
 	LocalDate today = LocalDate.now();
 
-	String begin = today.minusDays(10).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+	// String begin = today.minusDays(10).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-	String end = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+	// String end = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+	
+	String begin = "20260724";  // 원하는 시작일
+	String end = "20260724";    // 원하는 종료일
 
 	System.out.println("========== 공고 수집 시작 ==========");
 
@@ -290,10 +293,10 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
     }
 
     @Override
-    public List<NoticeModel> getAllNotices() {
-	return noticeMapper.selectAllNotices();
+    public List<NoticeModel> getAllNotices(String region, String contractMethod, String agency) {
+	return noticeMapper.selectAllNotices(region, contractMethod, agency);
     }
-    
+
     @Override
     public Map<String, Object> getNoticeDetail(String noticeNumber) {
 
@@ -307,22 +310,23 @@ public class NoticeApiServiceImpl implements NoticeApiServiceIF {
 
 	return result;
     }
-    
+
     @Override
     public Map<String, Object> getNoticeStats(Long memberId) {
-        
-    	Map<String, Object> stats = new HashMap<>();
-        
-    	stats.put("totalCount", noticeMapper.countActiveNotices());
-        stats.put("todayCount", noticeMapper.countTodayNotices());
-        stats.put("avgAmount", noticeMapper.selectAvgAmount());
 
-        if (memberId != null) {
-            stats.put("keywordMatchCount", noticeMapper.countKeywordMatchByMember(memberId));
-        } else {
-            stats.put("keywordMatchCount", null);
-        }
-        return stats;
+	Map<String, Object> stats = new HashMap<>();
+
+	stats.put("totalCount", noticeMapper.countActiveNotices());
+	stats.put("todayCount", noticeMapper.countTodayNotices());
+	stats.put("avgAmount", noticeMapper.selectAvgAmount());
+
+	if (memberId != null) {
+	    stats.put("keywordMatchCount", noticeMapper.countKeywordMatchByMember(memberId));
+	} else {
+	    stats.put("keywordMatchCount", null);
+	}
+
+	return stats;
     }
 
 //    public Map<String, Object> getNoticeDetailLive(String noticeNumber) {

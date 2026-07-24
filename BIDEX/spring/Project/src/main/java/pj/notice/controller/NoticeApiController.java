@@ -4,15 +4,15 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import pj.notice.model.NoticeModel;
 import pj.notice.service.NoticeApiServiceIF;
-
-import org.springframework.security.core.Authentication;
 import pj.security.CustomUserDetails;
 
 @RestController
@@ -23,8 +23,10 @@ public class NoticeApiController {
     private NoticeApiServiceIF service;
 
     @GetMapping
-    public List<NoticeModel> getNotices() {
-	return service.getAllNotices();
+    public List<NoticeModel> getNotices(@RequestParam(required = false) String region,
+	    @RequestParam(required = false) String contractMethod, @RequestParam(required = false) String agency) {
+
+	return service.getAllNotices(region, contractMethod, agency);
     }
 
     @GetMapping("/fetch")
@@ -42,12 +44,12 @@ public class NoticeApiController {
 
     @GetMapping("/stats")
     public Map<String, Object> getStats(Authentication authentication) {
-        Long memberId = null;
-        if (authentication != null && authentication.isAuthenticated()
-                && authentication.getPrincipal() instanceof CustomUserDetails) {
-            memberId = ((CustomUserDetails) authentication.getPrincipal()).getMemberId();
-        }
-        return service.getNoticeStats(memberId);
+	Long memberId = null;
+	if (authentication != null && authentication.isAuthenticated()
+	        && authentication.getPrincipal() instanceof CustomUserDetails) {
+	    memberId = ((CustomUserDetails) authentication.getPrincipal()).getMemberId();
+	}
+	return service.getNoticeStats(memberId);
     }
 
 //    // 공공 API 호출
