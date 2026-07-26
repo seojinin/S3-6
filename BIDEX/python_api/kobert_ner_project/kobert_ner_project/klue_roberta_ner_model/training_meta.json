@@ -1,0 +1,14 @@
+{
+  "seed": 42,
+  "valid_ratio": 0.2,
+  "train_sentences": 389,
+  "valid_sentences": 97,
+  "stopwords_count": 693,
+  "stopword_policy": "trim",
+  "epochs": 60,
+  "learning_rate": 3e-05,
+  "eval_f1": 0.8223684210526316,
+  "eval_precision": 0.8561643835616438,
+  "eval_recall": 0.7911392405063291,
+  "note": "v2 + 불용어 분절 수정 (경계 trim)"
+}
